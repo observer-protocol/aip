@@ -4,21 +4,23 @@ This repository hosts the specification for the Agentic Identity Protocol — th
 
 ## Status
 
-AIP is under active development. Two drafts are currently published in this repository:
+AIP is under active development. Three drafts are currently published in this repository:
 
 - `aip-v0.6-draft-1.md` — the core protocol (DIDs, credential lifecycle, verification flow, attestation taxonomy).
 - `aip-v0.7-draft-1.md` — a lightweight additive extension to v0.6 introducing an optional `tradingMandate` sub-object on `ObserverDelegationCredential` for scoped trading-agent authorization.
+- `aip-v0.8-draft-1.md` — additive policy mandate extensions (`counterparty`, `temporal`, `geographic`, `velocity` sub-objects under `tradingMandate`) and the new `PolicyEvaluationCredential` type for signed enforcement decisions.
 
 Draft status means each document reflects committed architectural decisions but is subject to revision based on feedback from technical advisors, reference implementation experience, and community input. Substantive changes will be reflected as numbered draft revisions with visible diff. Final versions will be tagged when review is complete.
 
-v0.7 is purely additive to v0.6. Implementations conforming to v0.6 remain conforming without modification; v0.7 capabilities are opt-in by issuing or reading the new sub-object. Implementations consuming either draft should expect non-breaking refinements before final.
+v0.7 and v0.8 are both purely additive to v0.6. Implementations conforming to v0.6 remain conforming without modification; v0.7 and v0.8 capabilities are opt-in by issuing or reading the new sub-objects and (for v0.8) the new credential type. Implementations consuming any draft should expect non-breaking refinements before final.
 
 ## Current drafts
 
 - [`aip-v0.6-draft-1.md`](./aip-v0.6-draft-1.md) — core protocol (May 2026).
 - [`aip-v0.7-draft-1.md`](./aip-v0.7-draft-1.md) — trading delegation profile (May 2026). Builds on v0.6; not a replacement.
+- [`aip-v0.8-draft-1.md`](./aip-v0.8-draft-1.md) — policy mandate extensions + `PolicyEvaluationCredential` (May 2026). Builds on v0.7; not a replacement.
 
-Previous versions of AIP (v0.3.1, v0.5) are not maintained in this repository. v0.6 supersedes them, with the migration path documented in Section 10. v0.7 extends v0.6 rather than superseding it.
+Previous versions of AIP (v0.3.1, v0.5) are not maintained in this repository. v0.6 supersedes them, with the migration path documented in Section 10. v0.7 and v0.8 extend v0.6 rather than superseding it.
 
 ## Review and feedback
 
