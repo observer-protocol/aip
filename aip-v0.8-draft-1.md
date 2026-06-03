@@ -33,7 +33,7 @@ v0.8 changes nothing about v0.6 or v0.7. It defines additional optional sub-obje
 - v0.6 envelope and verification flow — unchanged.
 - v0.6 `actionScope` fields expressing payment/spending authority — vocabulary canonicalised in v0.8 to snake_case (the casing already deployed in the reference Sovereign implementation): `allowed_rails`, `per_transaction_ceiling`, `allowed_transaction_categories`, gated by the sibling `authorizationLevel` / `authorizationConfig` pair that distinguishes one-time / recurring / policy-driven payments. v0.5's camelCase names (`rails`, `maxTransactionValue`, `allowedActions`) are deprecated; verifiers MAY accept them for credentials issued under earlier drafts.
 - v0.7 `tradingMandate` fields (`allowedVenues`, `allowedInstruments`, `maxNotionalPerOrder`, `maxPosition`, `unit`, `dailyDrawdownCap`) — unchanged (camelCase, consistent with v0.7).
-- v0.7 schema (`delegation/v2.json`) — extended in place. The v0.8 sub-objects on `tradingMandate` (`counterparty`, `temporal`, `geographic`, `velocity`) and the v0.8 fields on `actionScope` (notably `cumulative_budget`, plus the reserved-advisory fields in §1.3) are explicitly enumerated as properties. As of v0.8, both `actionScope` and `credentialSubject` close `additionalProperties: false` — silent extension of either object is disallowed; new fields require a numbered-draft schema update.
+- v0.7 schema (`delegation/v2.json`) — frozen at its published content. v0.8 ships a new sibling URL, `delegation/v2.1.json`, carrying: the v0.8 sub-objects on `tradingMandate` (`counterparty`, `temporal`, `geographic`, `velocity`); the v0.8 fields on `actionScope` (notably `cumulative_budget`, plus the reserved-advisory fields in §1.3); and `additionalProperties: false` closed on both `actionScope` and `credentialSubject` — silent extension of either object is disallowed; future field additions require a numbered-draft schema update at a new URL. Credentials previously issued against `delegation/v2.json` continue to validate against `delegation/v2.json` forever; new v0.8-conformant credentials carry `credentialSchema.id = delegation/v2.1.json`. See `SCHEMA_POLICY.md` in this repository for the schema immutability policy.
 
 A credential carrying only v0.7 fields is a valid v0.8 credential. A credential adding any of the v0.8 sub-objects remains a valid v0.7 credential to any verifier that does not read the new fields.
 
@@ -393,7 +393,7 @@ A scoped trading delegation carrying v0.7 fields plus v0.8 `counterparty`, `temp
     }
   },
   "credentialSchema": {
-    "id": "https://observerprotocol.org/schemas/delegation/v2.json",
+    "id": "https://observerprotocol.org/schemas/delegation/v2.1.json",
     "type": "JsonSchema"
   },
   "proof": {
