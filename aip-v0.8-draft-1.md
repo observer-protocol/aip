@@ -15,12 +15,12 @@ v0.8 is purely additive to v0.7. Existing v0.7-conformant verifiers continue to 
 
 ## Executive summary
 
-v0.7 introduced `tradingMandate` as a cryptographically-bound expression of *what an agent is authorized to do*. It did not specify how to express counterparty, temporal, geographic, or velocity constraints — and it did not define the protocol-native shape of a *decision* about whether a specific proposed action falls within the mandate.
+v0.7 introduced `tradingMandate` as a cryptographically-bound expression of *what an agent is authorized to do* on trading-domain actions, complementing the v0.6 `actionScope` construct which expresses payment/spending authority. v0.7 did not specify how to express counterparty, temporal, geographic, or velocity constraints on `tradingMandate` — and neither v0.6 nor v0.7 defined the protocol-native shape of a *decision* about whether a specific proposed action falls within either mandate surface.
 
 v0.8 closes both gaps with the smallest set of additions that lets the protocol express enforcement policy and emit cryptographically-verifiable enforcement decisions:
 
 - `tradingMandate` gains four additional optional sub-objects, all expressed inside the existing `ObserverDelegationCredential` envelope. The credential remains the authoritative scope of authority — there is no separate mutable policy store.
-- `PolicyEvaluationCredential` is a new Verifiable Credential type that wraps an enforcement decision (allow or deny, with a structured reason on deny) and binds it to the specific proposed action and the specific delegation it was evaluated against. Issuance uses an on-server assertionMethod-valid key (`#key-3`); see §3.4.
+- `PolicyEvaluationCredential` is a new Verifiable Credential type that wraps an enforcement decision (allow or deny, with a structured reason on deny) and binds it to the specific proposed action and the specific delegation it was evaluated against. It is uniform across both mandate surfaces — the same credential type carries verdicts on `actionScope` (spending) and `tradingMandate` (trading) actions. Issuance uses an on-server assertionMethod-valid key (`#key-3`); see §3.4.
 
 These two additions, together, make the *Policy / Approval* control in the buyer mapping (v0.7 §5) cryptographically realisable rather than aspirational.
 
@@ -31,10 +31,98 @@ These two additions, together, make the *Policy / Approval* control in the buyer
 v0.8 changes nothing about v0.6 or v0.7. It defines additional optional sub-objects inside the v0.7 `tradingMandate` and introduces one new credential type. Existing verifiers operate without modification.
 
 - v0.6 envelope and verification flow — unchanged.
-- v0.7 `tradingMandate` fields (`allowedVenues`, `allowedInstruments`, `maxNotionalPerOrder`, `maxPosition`, `unit`, `dailyDrawdownCap`) — unchanged.
-- v0.7 schema (`delegation/v2.json`) — extended in place. `credentialSubject.tradingMandate` already inherits `additionalProperties: true`, so the new sub-objects are accepted without a breaking schema change.
+- v0.6 `actionScope` fields expressing payment/spending authority — vocabulary canonicalised in v0.8 to snake_case (the casing already deployed in the reference Sovereign implementation): `allowed_rails`, `per_transaction_ceiling`, `allowed_transaction_categories`, gated by the sibling `authorizationLevel` / `authorizationConfig` pair that distinguishes one-time / recurring / policy-driven payments. v0.5's camelCase names (`rails`, `maxTransactionValue`, `allowedActions`) are deprecated; verifiers MAY accept them for credentials issued under earlier drafts.
+- v0.7 `tradingMandate` fields (`allowedVenues`, `allowedInstruments`, `maxNotionalPerOrder`, `maxPosition`, `unit`, `dailyDrawdownCap`) — unchanged (camelCase, consistent with v0.7).
+- v0.7 schema (`delegation/v2.json`) — extended in place. The v0.8 sub-objects on `tradingMandate` (`counterparty`, `temporal`, `geographic`, `velocity`) and the v0.8 fields on `actionScope` (notably `cumulative_budget`, plus the reserved-advisory fields in §1.3) are explicitly enumerated as properties. As of v0.8, both `actionScope` and `credentialSubject` close `additionalProperties: false` — silent extension of either object is disallowed; new fields require a numbered-draft schema update.
 
 A credential carrying only v0.7 fields is a valid v0.8 credential. A credential adding any of the v0.8 sub-objects remains a valid v0.7 credential to any verifier that does not read the new fields.
+
+### 1.1 Mandate surfaces
+
+`credentialSubject` carries two parallel mandate surfaces, either or both of which MAY be present in a single `ObserverDelegationCredential`:
+
+| Surface | Domain | Defined in | Key fields |
+|---|---|---|---|
+| `actionScope` | Payment / spending | v0.6 (envelope), v0.5 (initial field vocabulary), v0.8 (snake_case canonicalisation + `cumulative_budget`) | `allowed_rails`, `per_transaction_ceiling`, `allowed_transaction_categories`, `cumulative_budget` (§1.2); gated by sibling `authorizationLevel` + `authorizationConfig` |
+| `tradingMandate` | Trading | v0.7, extended by v0.8 §2 | `allowedVenues`, `allowedInstruments`, `maxNotionalPerOrder`, `maxPosition`, `unit`, `dailyDrawdownCap`, plus v0.8 `counterparty` / `temporal` / `geographic` / `velocity` |
+
+The surfaces are siblings, not alternatives — a delegation that authorises both spending and trading carries both. The `PolicyEvaluationCredential` defined in §3 emits verdicts against whichever surface(s) the proposed action engages; the verdict format (§3.2) is uniform across surfaces, with `denyReason.ruleType` and `denyReason.ruleField` disambiguating which surface and which field within it produced the denial.
+
+### 1.2 Cumulative budget on the spending mandate
+
+`actionScope` MAY carry an optional `cumulative_budget` sub-object expressing a total spend cap over the lifetime of the delegation. This deliverable is **expression-layer only**: issuers can declare a cap and verifiers MUST surface it, but the v0.8 protocol does NOT define cumulative enforcement. Per-transaction binding remains exclusively on `per_transaction_ceiling`.
+
+Shape:
+
+```jsonc
+"actionScope": {
+  "allowed_rails": ["lightning", "usdt_tron"],
+  "allowed_transaction_categories": ["..."],
+  "per_transaction_ceiling": { "amount": "25000", "currency": "USDT" },
+  "cumulative_budget": {
+    "amount": "250000",
+    "currency": "USDT",
+    "window": "credential_validity"
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `amount` | string | Decimal amount expressed as a string (avoids float coercion at the wire level). |
+| `currency` | string | ISO 4217 code, settlement-rail token symbol (e.g. `USDT`, `BTC`), or rail-native unit (`sats`). |
+| `window` | string | v0.8 defines exactly one allowed value: `"credential_validity"` — the cap applies cumulatively over `validFrom` → `validUntil`. |
+
+The flat `{ amount, currency, window? }` shape is shared with `per_transaction_ceiling`; both inherit the same string-amount convention. A nested `amount: { value, currency }` shape is reserved for a future draft alongside per-rail denomination (§6).
+
+Normative requirements:
+
+1. The field is OPTIONAL. Credentials without it remain conformant and verifiable.
+2. The `window` enum is closed in v0.8 to `"credential_validity"`. Rolling-window, calendar-period, timezone, and reset semantics are deferred to a future draft alongside binding enforcement. Implementations MUST reject any other `window` value as malformed.
+3. Cumulative budget is **advisory only**. `PolicyEvaluationCredential` MUST NOT issue `decision: "deny"` on `cumulative_budget` grounds in v0.8. There is no `ruleType` value reserved for cumulative-budget violations (see §3.2). Verifiers and evaluators MAY surface an out-of-band advisory signal (e.g. an `over_budget_advisory` flag in their result envelope), but this signal is NOT a `PolicyEvaluationCredential` verdict.
+4. `verify()` (or its equivalent in any conforming verifier) MUST surface the declared `cumulative_budget` in its result when the field is present.
+5. **Same-currency only.** Where attestation history is available and a verifier computes an advisory spent/remaining figure, only prior settled spends in the same currency as `cumulative_budget.amount.currency` are summed. Cross-currency prior spends MUST be reported separately as uncountable; they MUST NOT be normalised, converted, or rate-translated. The v0.8 evaluator carries no FX or price oracle and MUST NOT acquire one for this purpose — doing so would import settlement truth into a credential layer whose role is verification.
+6. The credential remains the authoritative scope of authority. Cumulative-spend accounting state lives outside the credential and is reconstructed from attestation history (see §3 `PolicyEvaluationCredential` and downstream settlement-attestation records). The cumulative figure surfaced by a verifier is a projection of that history, not a credential field.
+
+Deliberately deferred (out of scope for v0.8, reserved for future draft):
+
+- Binding cumulative enforcement (a `decision: "deny"` on cumulative grounds).
+- Rolling-window or calendar-period semantics (`daily`, `monthly`, `2026-Q3`, etc.).
+- Per-rail amount denomination for both `per_transaction_ceiling` and `cumulative_budget` (the single-scalar shape above is provisional; a per-rail-map variant is under discussion).
+- Any cross-currency normalisation path.
+
+### 1.3 Reserved advisory fields on the spending mandate
+
+`actionScope` reserves two additional optional sub-objects in v0.8. Like `cumulative_budget` (§1.2) they are **expression-only, advisory** — verifiers MUST surface them when present, but they MUST NOT ground a `PolicyEvaluationCredential` deny in v0.8. Binding semantics for either is deferred to a future draft and will be introduced with explicit `ruleType` values at that point.
+
+#### `allowed_counterparty_types`
+
+Closed list of permitted counterparty classes. Constrained shape:
+
+| Field | Type | Description |
+|---|---|---|
+| (top-level) | array of strings | Each entry is a counterparty-class label drawn from `verified_merchant`, `kyb_verified_org`, `peer_agent`, `sovereign_self_attested`. Future drafts may extend this enum; verifiers SHOULD ignore unknown values rather than fail. |
+
+In v0.8 this is an advisory declaration of intent; it is not a deny grounds. Binding counterparty-class enforcement on the spending surface is reserved.
+
+#### `geographic_restriction`
+
+Constrained shape:
+
+| Field | Type | Description |
+|---|---|---|
+| `allowed` | array of strings | ISO 3166-1 alpha-2 country codes; if present, counterparty SHOULD belong to one of these. |
+| `disallowed` | array of strings | ISO 3166-1 alpha-2 country codes; if present, counterparty SHOULD NOT belong to any. |
+
+Same advisory-only status as above. Geographic enforcement on the **trading** surface (§2.3 `tradingMandate.geographic`) is binding under v0.8; the spending-surface counterpart is reserved.
+
+#### Held: `allowed_merchant_categories`
+
+A categories-namespace collision with `allowed_transaction_categories` is unresolved as of v0.8 draft-1 — broadly: whether the v0.8 spending mandate has one categories field describing the action ("what is being purchased") or two distinguishing action-category from merchant-category (e.g. MCC-style). The field is **not reserved** in v0.8 and MUST NOT appear in conforming credentials; a future draft will define exactly one of: (a) a single, renamed categories field; (b) two clearly-distinguished fields. Issuers that need a merchant-class taxonomy in the interim SHOULD encode it through `allowed_counterparty_types` (§1.3).
+
+#### Closure
+
+`actionScope` closes `additionalProperties: false` in v0.8. The complete enumerable property set is: `allowed_rails`, `per_transaction_ceiling`, `allowed_transaction_categories`, `cumulative_budget`, `allowed_counterparty_types`, `geographic_restriction`. Any other property is a schema violation.
 
 ---
 
@@ -139,11 +227,35 @@ The `credentialSubject` carries the decision and its bindings:
 
 | Field | Type | Description |
 |---|---|---|
-| `ruleType` | string | One of: `amountLimits`, `counterparty`, `temporal`, `geographic`, `velocity`. |
-| `ruleField` | string | The specific field that failed, e.g. `maxNotionalPerOrder`, `requireIssuerClassIn`, `dailyVolumeCap`. |
+| `ruleType` | string | One of: `amountLimits`, `actionScope`, `counterparty`, `temporal`, `geographic`, `velocity`, `authorization`. See enum semantics below. |
+| `ruleField` | string | The specific field that failed, e.g. `maxNotionalPerOrder`, `maxTransactionValue`, `rails`, `allowedActions`, `requireIssuerClassIn`, `dailyVolumeCap`. |
 | `message` | string | Human-readable explanation. |
 | `currentValue` | any | Optional. The state value at evaluation time (e.g. current rolling daily volume). |
 | `proposedValue` | any | Optional. The proposed change (e.g. the proposed transaction notional). |
+
+`ruleType` enum semantics (the surface is implied; `ruleField` disambiguates within the surface):
+
+| `ruleType` | Surface | Covers |
+|---|---|---|
+| `amountLimits` | both | Per-action amount-bound violations on either surface: `actionScope.per_transaction_ceiling` (spending) or `tradingMandate.maxNotionalPerOrder` / `tradingMandate.maxPosition` (trading). |
+| `actionScope` | spending | Scope-list violations on `actionScope`: `allowed_rails`, `allowed_transaction_categories`. |
+| `counterparty` | trading | `tradingMandate.counterparty.*` (§2.1). |
+| `temporal` | trading | `tradingMandate.temporal.*` (§2.2). |
+| `geographic` | trading | `tradingMandate.geographic.*` (§2.3). |
+| `velocity` | trading | `tradingMandate.velocity.*` (§2.4). |
+| `authorization` | spending | Violations of the `authorizationLevel` / `authorizationConfig` gate (e.g. a recurring-payment proposal whose terms exceed the recurring schedule, or a policy-level proposal that fails its policy-id binding). |
+
+Verifiers consuming a deny credential SHOULD route on `ruleType` first and use `ruleField` for field-level handling. The enum is closed for v0.8; future ruleType values are added via a numbered draft.
+
+**Currency-mismatch denials.** When a proposed action's amount currency differs from the relevant ceiling's currency (e.g. `proposal.amount.currency != actionScope.per_transaction_ceiling.amount.currency`), the action MUST be denied with `ruleType: amountLimits` and a `ruleField` naming the ceiling. The evaluator MUST NOT perform currency conversion to make the comparison succeed. The `message` SHOULD identify the mismatch explicitly. This rule applies symmetrically to `tradingMandate.unit`-denominated ceilings.
+
+**Advisory-field exclusion.** No `ruleType` value is defined in v0.8 for any of the spending-surface advisory fields:
+
+- `actionScope.cumulative_budget` (§1.2)
+- `actionScope.allowed_counterparty_types` (§1.3)
+- `actionScope.geographic_restriction` (§1.3)
+
+A `PolicyEvaluationCredential` MUST NOT carry a `decision: "deny"` whose sole or primary justification is the violation of any of these fields. Their binding counterparts are reserved for a future draft and will introduce explicit `ruleType` values at that point. Verifiers MAY surface advisory signals out-of-band (e.g. on their own result envelopes), but those signals are not v0.8 verdicts.
 
 ### 3.3 Decision binding
 
@@ -189,7 +301,7 @@ This refines the v0.7 §5 buyer-mapping table for the four authorisation control
 | Control | Address |
 |---|---|
 | Identity — *who is this agent, and who authorized it?* | v0.6 credential chain: verified principal → agent DID → delegation credential. **Live.** |
-| Permissions — *what is it allowed to do?* | v0.7 `tradingMandate` core fields + v0.8 sub-objects (`counterparty`, `temporal`, `geographic`, `velocity`). **Live in v0.8.** |
+| Permissions — *what is it allowed to do?* | v0.6 `actionScope` (spending: `allowed_rails`, `per_transaction_ceiling`, `allowed_transaction_categories`, gated by `authorizationLevel` / `authorizationConfig`; v0.8 adds optional advisory `cumulative_budget` per §1.2) and v0.7 `tradingMandate` core fields + v0.8 sub-objects (`counterparty`, `temporal`, `geographic`, `velocity`). Sibling mandate surfaces — see §1.1. **Both live in v0.8.** |
 | Policy / Approval — *did this action fall within the mandate?* | v0.8 `PolicyEvaluationCredential` — signed decision bound to the specific proposed action and the specific delegation. **Live in v0.8.** |
 | Auditability — *what happened, provably?* | Ed25519-signed credential events on Observer Protocol; the chain of (delegation → evaluation decision → trade-shaped audit record) is available end-to-end. The trade-shaped audit record (v1) and holder-signed verifiable presentations remain in scope for subsequent work. |
 
@@ -203,6 +315,9 @@ v0.8 is the credential-and-decision layer. It does NOT define:
 
 - **Wallet integration mechanics.** How a specific wallet implementation (WDK, Aqua/Liquid, others) invokes the evaluator, caches binding data, and surfaces denials to its user is an integration concern, not a protocol concern. Reference integration guides ship separately.
 - **Evaluator state management.** Where running counters for velocity rules are maintained, how attestation data is fetched and cached, and how the evaluator interacts with the OP attestation registry are implementation concerns.
+- **Binding cumulative-budget enforcement.** v0.8 ships `cumulative_budget` as expression-only (§1.2). A future draft will define the rolling-window vocabulary, the reset/timezone semantics, and the binding-deny path; until that draft, claims of cumulative enforcement under v0.8 are NOT supported.
+- **Currency conversion in evaluators.** The evaluator carries no FX or price oracle. Cross-currency amounts are denied (per §3.2) or reported as uncountable (per §1.2(5)); they are never normalised.
+- **Per-rail amount denomination.** Whether `per_transaction_ceiling` and `cumulative_budget` SHOULD carry a single `{amount.value, amount.currency}` scalar or a per-rail map is under discussion. v0.8 specifies the scalar shape provisionally; a future draft may add the per-rail variant.
 - **AT-ARS as a policy input.** Reputation-as-a-rule (e.g. "counterparty must have AT-ARS ≥ N") is reserved for a future revision. v0.8 does not include an `atArsMinimum` field; the existing `requireIssuerClassIn` is the assertion-source primitive.
 - **Multi-sig policy approval workflows.** v0.8 expresses single-evaluator decisions. Multi-party policy approval is reserved.
 - **Cross-chain unified policy.** A single mandate spanning multiple rails is expressible (omit rail-specific constraints), but cross-rail aggregate state (e.g. one velocity counter spanning EVM + TRON) is an evaluator concern not specified here.
@@ -375,3 +490,52 @@ Venue/instrument labels are illustrative; not authorisations against any real ve
 ```
 
 The values denominated as USD inherit the credential's `tradingMandate.unit` field; absent that, `denyReason.currentValue`/`proposedValue` are dimensionless and the human-readable `message` carries the unit context.
+
+### Deny case — `actionScope` (spending mandate)
+
+A proposed payment exceeds the per-transaction ceiling on the spending-mandate surface. The verdict shape is identical to the trading-mandate case — `ruleType` and `ruleField` route the consumer to the violated surface.
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/credentials/v2"],
+  "id": "urn:uuid:policy-eval-demo-spending-deny",
+  "type": ["VerifiableCredential", "PolicyEvaluationCredential"],
+  "issuer": "did:web:observerprotocol.org",
+  "validFrom": "2026-05-24T14:31:08Z",
+  "credentialSubject": {
+    "decision": "deny",
+    "denyReason": {
+      "ruleType": "amountLimits",
+      "ruleField": "per_transaction_ceiling",
+      "message": "Proposed payment exceeds actionScope.per_transaction_ceiling.",
+      "currentValue": { "amount": "25000", "currency": "USDT" },
+      "proposedValue": { "amount": "40000", "currency": "USDT" }
+    },
+    "evaluatedAgainst": {
+      "delegationCredentialId": "urn:uuid:observer-delegation-spending-example",
+      "delegationCredentialHash": "<sha256-hex of canonical delegation bytes>"
+    },
+    "proposal": {
+      "proposalHash": "<sha256-hex of canonical proposed-action bytes>",
+      "rail": "usdt_tron"
+    },
+    "evaluator": {
+      "id": "urn:observer-protocol:evaluator:policy-core-v1",
+      "version": "policy-core-1.0.0"
+    },
+    "evaluatedAt": "2026-05-24T14:31:08Z",
+    "evaluatedWithAttestations": true
+  },
+  "proof": {
+    "type": "Ed25519Signature2026",
+    "created": "2026-05-24T14:31:08Z",
+    "verificationMethod": "did:web:observerprotocol.org#key-3",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z<base58btc-Ed25519-signature>"
+  }
+}
+```
+
+Spending-mandate amount values carry their own `{ amount, currency }` shape per §1.2. They do not inherit the `tradingMandate.unit` field.
+
+Note: no `cumulative_budget`-grounded deny example is given — by §1.2(3) and §3.2 the protocol does not emit one in v0.8.
