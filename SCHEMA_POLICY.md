@@ -24,7 +24,7 @@ The W3C VC Data Model treats `credentialSchema.id` as a pointer to a stable, add
 - **Old URLs stay live.** The previous URL keeps serving its previous bytes for as long as credentials issued under it may still be in circulation — i.e. effectively forever. We do not delete or 301-redirect old schema URLs.
 - **Issuance updates to the new URL.** When a new schema version is published, the issuer code embeds the new URL in `credentialSchema.id` for newly-issued credentials. Already-issued credentials keep their pinned URL and continue to validate against it.
 - **Spec and adapter pinning.** AIP draft documents reference schema URLs by exact version (no floating "latest" link). Downstream adapters (e.g. WDK integration) SHOULD pin the expected `credentialSchema.id` to a specific URL they were built against, and SHOULD reject credentials carrying a `credentialSchema.id` they do not recognise rather than fetching arbitrary URLs.
-- **Schema-source repository.** Schema documents are authored in this repository (`observer-protocol/aip`) and deployed to `observer-protocol/observerprotocol-website` under `schemas/`. The committed source in this repo is the canonical pre-deploy artifact.
+- **Schema-source repository.** Schema documents are authored in this repository (`observer-protocol/aip`) under `schemas/<credential-type>/<version>.json`, and are the single source of truth. Deployment to `observer-protocol/observerprotocol-website` under `schemas/` is a **verbatim byte-for-byte copy** — the deployed file and its `aip` source MUST be identical (same `sha256`). The served `$id` therefore always matches the file's own `$id`. No edits are made on the website side; any change starts in `aip`.
 
 ## Cross-references
 
