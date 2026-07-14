@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://observerprotocol.org/schemas/delegation/v2.json",
-  "title": "Delegation Credential Schema v2",
-  "description": "JSON Schema for DelegationCredential Verifiable Credentials with three-level authorization model. Extends v1 with authorizationLevel and authorizationConfig. Backward compatible: v1 credentials remain valid; v2 adds required authorizationLevel field.",
+  "$id": "https://observerprotocol.org/schemas/delegation/v2.1.json",
+  "title": "Delegation Credential Schema v2.1",
+  "description": "JSON Schema for DelegationCredential Verifiable Credentials aligned with AIP v0.8 draft-1. Extends v2 with: snake_case canonicalisation of actionScope; cumulative_budget (advisory, window enum locked to credential_validity); reserved-advisory allowed_counterparty_types and geographic_restriction with constrained shapes; allowed_merchant_categories held pending categories-namespace collision; tradingMandate v0.8 sub-objects (counterparty, temporal, geographic, velocity); additionalProperties closed on actionScope and credentialSubject. The v2 URL (delegation/v2.json) remains live, immutable, and frozen at its prior content; this is a new sibling URL per the schema immutability policy (see aip repo SCHEMA_POLICY.md). Credentials previously issued against v2.json continue to validate against v2.json forever.",
   "type": "object",
   "required": [
     "@context",
