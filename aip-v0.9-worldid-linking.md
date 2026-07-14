@@ -23,7 +23,7 @@ World ID answers precisely that question. v0.9 defines how an agent's OP credent
 - Worldcoin remains the authoritative source of personhood. OP composes the signal; it does not re-issue personhood. No change is required on Worldcoin's side.
 - No World ID identity material (no `identity_secret`, no raw proof beyond what is needed for one-time verification) is persisted by OP. The credential carries only the nullifier hash, the action, and the verification metadata.
 
-The integration's load-bearing invariant is **OP-global action scoping** (§3): one human who claims multiple agents across all OP surfaces produces the *same* nullifier, which is what makes proof-of-personhood composable with delegation, payment history, and reputation across the protocol — rather than fragmented per surface.
+The integration's load-bearing invariant is **OP-global nullifier scoping** to a single `(rp_id, action)` (§3): one human who claims multiple agents across all OP surfaces produces the *same* nullifier, which is what makes proof-of-personhood composable with delegation, payment history, and reputation across the protocol — rather than fragmented per surface.
 
 ---
 
@@ -63,9 +63,11 @@ This differs from the `PrincipalAttestationCredential` and the `ObserverDelegati
 | `id` | string (DID) | The OP agent DID this binding belongs to, e.g. `did:web:observerprotocol.org:agents:{agent_id}`. |
 | `humanSubject` | string (DID) | The human principal's own did:web DID — identical to the `issuer` of the agent's self-issued `PrincipalAttestationCredential` (§2.2). The binding asserts that this principal completed World ID verification. |
 | `worldIdNullifier` | string | The World ID nullifier hash returned by IDKit. Private; exposure is governed by §4. |
-| `worldIdAction` | string | The Worldcoin action the proof was generated for. In v0.9 this is the single OP-global value `observer-protocol-agent-link` (§3). |
-| `worldIdAppId` | string | The Worldcoin Developer Portal `app_id` under which the action is registered (§3, §13). |
+| `worldIdRpId` | string | The World ID 4.0 relying-party identifier (`rp_…`) the nullifier is scoped to. Under 4.0 a nullifier is only meaningful relative to `(rp_id, action)`, so the credential records the `rp_id` as the nullifier's **namespace anchor** — a nullifier without its `rp_id` is not independently interpretable. Single OP-controlled value across all OP surfaces (§3). |
+| `worldIdAction` | string | The Worldcoin action the proof was generated for. In v0.9 this is the single OP-global value `observer-protocol-agent-link` (§3). The nullifier is scoped to `(worldIdRpId, worldIdAction)`. |
+| `worldIdAppId` | string | The Worldcoin Developer Portal `app_id` (`app_…`) under which the action is registered — the portal/config identifier (deep links, portal settings), **not** the nullifier namespace (that is `worldIdRpId`). (§3, §13). |
 | `verificationPath` | string | `"on-chain"` or `"off-chain"` — how OP verified the proof at bind time (§7). |
+| `proofType` | string | `"action_proof"` (first issuance) or `"session_proof"` (every subsequent bind or re-bind). Assurance signal distinguishing a fresh one-time World ID action proof from OP re-asserting the stored nullifier via a session proof (§5.5). Not derivable from `priorBindingId`. |
 | `verifiedAt` | string | ISO 8601 timestamp of when OP verified the proof and created the binding. |
 | `priorBindingId` | string \| null | Nullable. On a re-bind after revocation, the `id` of the prior (revoked) `WorldIDLinkageCredential`. Absent or `null` on a first bind (§6). |
 
@@ -79,23 +81,23 @@ The credential asserts a narrow, cryptographically-verifiable fact: a valid Worl
 
 ---
 
-## 3. Action scoping: OP-global
+## 3. Nullifier scoping: OP-global `(rp_id, action)`
 
-The Worldcoin Developer Portal action registered for this integration is a single, stable, OP-global identifier:
+Under World ID 4.0 a nullifier is scoped to the pair `(rp_id, action)`. v0.9 fixes both to single, stable, OP-global values: one OP-controlled relying-party identifier `rp_id`, and the action
 
 ```
 observer-protocol-agent-link
 ```
 
-A World ID nullifier is `hash(identity_secret, action)`. Same human + same action ⇒ same nullifier, everywhere. v0.9 fixes the action to one OP-global value so that a human who claims multiple agents — on `sovereign.agenticterminal.io`, the enterprise surface, or any future OP surface — produces the **same** nullifier across all of them. This is the foundational invariant that makes sybil-resistance hold protocol-wide rather than per-surface.
+The same human presenting for the same `(rp_id, action)` yields the **same** nullifier, everywhere. Fixing both to OP-global values means a human who claims multiple agents — on `sovereign.agenticterminal.io`, the enterprise surface, or any future OP surface — produces the **same** nullifier across all of them. This is the foundational invariant that makes sybil-resistance hold protocol-wide rather than per-surface.
 
 Normative requirements:
 
-1. `credentialSubject.worldIdAction` MUST equal `observer-protocol-agent-link` for all v0.9 `WorldIDLinkageCredential`s. A credential carrying any other action value is not a conforming v0.9 binding.
-2. The action is registered under a single OP-controlled Worldcoin `app_id` covering all OP surfaces (§13 open item 1–2). All OP surfaces issuing v0.9 bindings MUST use that same `app_id`, so that the nullifier is genuinely OP-global and not silently re-fragmented by per-surface app registration.
+1. `credentialSubject.worldIdAction` MUST equal `observer-protocol-agent-link`, and `credentialSubject.worldIdRpId` MUST equal OP's single OP-global `rp_id`, for all v0.9 `WorldIDLinkageCredential`s. A credential carrying any other action or `rp_id` value is not a conforming v0.9 binding.
+2. All OP surfaces issuing v0.9 bindings MUST present under that same OP-controlled `rp_id`, so that the nullifier — scoped to `(rp_id, action)` — is genuinely OP-global and not silently re-fragmented per surface. The action is registered in the Worldcoin Developer Portal under an OP-controlled `app_id`; the `app_id` is the portal/config identifier and does **not** scope the nullifier (that is the `rp_id`). See §13 open items.
 3. Within OP, "same nullifier ⇒ same human" is an intended, composable property — not a privacy leak to be defended against. The anti-correlation boundary is OP as a whole; §4 governs exposure *outside* that boundary.
 
-**Alternative considered and rejected.** Per-deployment action scoping would give stronger privacy isolation between OP surfaces, but the resulting per-surface nullifiers would make "one nullifier = one human" hold only within a single surface, fragmenting sybil-resistance and defeating the composable-identity property OP is built on. Per-deployment scoping fights OP's architecture; OP-global aligns with it. Multi-action schemes are out of scope for v0.9 (§11).
+**Alternative considered and rejected.** Per-surface `rp_id` scoping would give stronger privacy isolation between OP surfaces, but the resulting per-surface nullifiers would make "one nullifier = one human" hold only within a single surface, fragmenting sybil-resistance and defeating the composable-identity property OP is built on. Per-surface scoping fights OP's architecture; a single OP-global `rp_id` aligns with it. Multi-action schemes are out of scope for v0.9 (§11).
 
 ---
 
@@ -139,6 +141,27 @@ Normative requirements:
 2. Proof generation MUST occur on-device in World App (steps 2–3). OP MUST NOT request, receive, or reconstruct the `identity_secret`.
 3. Verification (step 6) MUST succeed before the credential is issued. A binding credential MUST NOT be issued for an unverified or failed proof.
 
+### 5.5 Proof model: one action proof, then session proofs (World ID 4.0)
+
+World ID 4.0 makes nullifiers strictly **one-time-use** per `(rp_id, action)`. This shapes how binding and re-binding work, and is the load-bearing constraint for §6.
+
+**Two proof types.**
+
+- **Action proof (first issuance).** The initial bind presents a World ID *action proof* for the OP-global action `observer-protocol-agent-link`. This is the one-time proof; the nullifier it yields is the canonical `worldIdNullifier` recorded in the credential (§2.2) and is the value that carries OP-global sybil-resistance (§3). Verifying it also **opens a session** for that human against OP.
+- **Session proof (every subsequent bind or re-bind).** Once a session is open, each later bind — a second agent for the same human, or a re-bind after revocation — is a World ID *session proof* against that session's `session_id`. Session proofs use a randomized action, so they return a `session_nullifier` that is unique per proof and enforces **no** uniqueness constraint: they never collide, and they never consume the one-time action nullifier.
+
+**OP re-asserts; it does not re-prove.** Because the action proof is one-time and cannot be re-derived, a session-proof binding does not carry a freshly-proven nullifier. OP looks up the human's canonical nullifier from its session store (keyed by `session_id`) and **re-asserts** it as the `worldIdNullifier` of the new binding. The nullifier is stable across a human's bindings because OP records it once and vouches for it thereafter — not because it is re-proven.
+
+**`session_id` is internal to OP verifier state and never appears in the credential body.** It would otherwise be a stable correlation handle across every agent a human binds — the same linkability surface §4 gates the nullifier to prevent. Same-human lineage is already available to authorized verifiers via the gated `worldIdNullifier` plus the `priorBindingId` chain (§6); exposing `session_id` would add only leakage, not auditability.
+
+**`proofType` is carried in the credential body** (§2.2) so a verifier can tell a fresh one-time proof from an OP re-assertion: `action_proof` for first issuance, `session_proof` for every subsequent bind. An `action_proof` binding rests on a fresh one-time Worldcoin proof; a `session_proof` binding rests on OP's session state. This is **not** derivable from `priorBindingId` — a *second agent* for the same human is a first bind (`priorBindingId: null`) issued via a session proof. Adding this field is a schema change: `worldid-linkage-v1.json` is `additionalProperties: false`, so v0.9 issues against `worldid-linkage-v2.json` with v1 frozen per the schema-immutability policy.
+
+**Session lifetime is indefinite at the Worldcoin layer; recency is an OP-layer concern.** Periodic re-proof via a fresh *action* proof is not available: a second action proof from the same human collides on the one-time nullifier and the authenticator refuses it. The only way to obtain periodic fresh action proofs is to *rotate the action*, which v0.9 rejects because it fragments the one-human-one-nullifier invariant the design rests on (§3). A fresh *session* proof re-proves nothing about personhood. The legitimate need behind expiry — *how recently was this link asserted* — is served at the OP layer by `verifiedAt` and re-bind recency along the `priorBindingId` chain (§6). This matches the protocol layering: **World ID answers "same human," OP answers "current standing."**
+
+**Durability, not a lockout cliff.** The session layer is recoverable by design: a lost `session_id` can be re-created with a fresh `oprf_seed`, yielding a new session with no one-time consumption. What is genuinely one-time is the canonical action nullifier, which OP records in the (holder-canonical, v0.6 §5.1) credential at first issuance. OP's `session_id → canonical-nullifier` map is therefore **load-bearing for issuance integrity**: losing it does not lock the human out at the Worldcoin layer — a session is re-creatable and the holder retains their binding credential — but it does break OP's ability to correlate an ongoing session back to the canonical nullifier without the holder re-presenting that credential. OP **MUST** persist this map durably, backed up alongside the issuance-key custody posture. True unrecoverability requires a *two-sided* loss — OP's map **and** the holder's credential both gone — because the action nullifier cannot be re-derived. Account recovery does not change this: recovery re-registers authenticators while preserving the account's `leafIndex`, from which the nullifier derives, so it reproduces the *same* nullifier rather than resetting it.
+
+**Assurance note: one-time-use is authenticator-enforced.** The one-time guarantee is enforced by the **authenticator**, which queries the Oblivious Nullifier Pool and declines to emit a repeat proof — not by pool-side or RP-side rejection of a submitted proof. It therefore rests on an honest-authenticator assumption, within Worldcoin's trust model. A `WorldIDLinkageCredential` attests that OP verified a valid proof under that model; verifiers weighing assurance SHOULD account for it.
+
 ---
 
 ## 6. Revocation: monotonic at the World ID layer, OP overlays binding state
@@ -157,12 +180,12 @@ This is the section that requires the most care, because the underlying constrai
 - **Sybil-resistance use case** — trust the World ID layer. A *revoked* binding still proves "this human was verified into OP at least once," which is sufficient to prevent the same human from quietly creating a second, ostensibly-unlinked OP identity. The nullifier's existence is the signal.
 - **Liveness use case** — trust the OP binding state. A revoked binding means the human has withdrawn consent for this binding; downstream systems that gate on *currently-active* personhood (e.g. the merchant-directory trust tiers) MUST treat a revoked binding as unverified.
 
-**Re-binding.** Because the action is OP-global, a human who re-links after revocation produces the *same* nullifier. v0.9 permits re-binding, with an audit-trail requirement:
+**Re-binding.** A re-bind does **not** re-run the World ID action proof. Under World ID 4.0 the action nullifier for `observer-protocol-agent-link` is one-time-use and cannot be re-derived (§5.5), so OP instead **re-asserts the stored canonical nullifier** for that human — from its session store, via a session proof — and issues a new binding carrying that same `worldIdNullifier`. The nullifier is stable across a human's bindings not because it is re-proven, but because OP records it once at first issuance and vouches for it thereafter. v0.9 permits re-binding, with an audit-trail requirement:
 
 1. A re-bind MUST be issued as a **new** `WorldIDLinkageCredential` (new `id`), with `priorBindingId` set to the `id` of the prior, revoked binding. It MUST NOT mutate the prior credential.
 2. Where a human has bound, revoked, and re-bound more than once (credentials A → B → C), `priorBindingId` MUST reference the **immediately preceding** binding (C → B → A), not the original. The bindings therefore form a singly-linked list walkable from newest to oldest; a verifier reconstructs the full history by following `priorBindingId` until it reaches a binding whose `priorBindingId` is `null` (the first bind).
 3. A verifier seeing a binding with a non-null `priorBindingId` can distinguish a re-bind from a first bind and can walk the chain of prior bindings for a complete, publicly-auditable history.
-3. The prior credential is retained (its registry entry remains `revoked`); it is not deleted. Historical verification against it continues to resolve correctly.
+4. The prior credential is retained (its registry entry remains `revoked`); it is not deleted. Historical verification against it continues to resolve correctly.
 
 **What revocation looks like in practice.**
 
@@ -175,7 +198,7 @@ This is the section that requires the most care, because the underlying constrai
 
 OP verifies the World ID proof (step 6 of §5) by one of two paths, recorded in `verificationPath`:
 
-- **Off-chain.** OP's binding endpoint verifies the proof using Worldcoin's off-chain verification SDK. Faster and cheaper; suitable for the interactive link-on-first-use flow. **This is the v0.9 default at link time.**
+- **Off-chain.** OP's binding endpoint verifies the proof via World's cloud verification API — `POST https://developer.world.org/api/v4/verify/{rp_id}` (World ID 4.0; `rp_id` is the path parameter, `app_id` accepted only for backward compatibility). Faster and cheaper; suitable for the interactive link-on-first-use flow. **This is the v0.9 default at link time.**
 - **On-chain.** OP's binding endpoint calls Worldcoin's on-chain verifier contract. Higher assurance, slower, incurs gas cost.
 
 Normative requirements:
@@ -253,7 +276,7 @@ Public claims of these capabilities under v0.9 are NOT supported.
 
 A conforming v0.9 implementation:
 
-1. Issues `WorldIDLinkageCredential`s per §2, with `worldIdAction` fixed to the OP-global `observer-protocol-agent-link` (§3) under a single OP-controlled `app_id`.
+1. Issues `WorldIDLinkageCredential`s per §2, with `worldIdAction` fixed to the OP-global `observer-protocol-agent-link` and `worldIdRpId` to OP's single OP-global `rp_id` (§3); the action is registered in the Worldcoin Developer Portal under an OP-controlled `app_id` (portal config, not the nullifier namespace).
 2. Performs World ID proof verification (§7) before issuance, persists no World ID identity material beyond the nullifier hash (§5), and does not expose the nullifier via any public endpoint (§4).
 3. Signs binding credentials with an `assertionMethod`-valid key scoped to this credential type (`#key-4`, §9), using `DataIntegrityProof` / `eddsa-jcs-2022` over the JCS-canonical credential.
 4. Records revocation via the OP revocation registry / `credentialStatus` (§6), never by mutating the signed credential, and issues re-binds as new credentials carrying `priorBindingId` (§6).
@@ -273,7 +296,7 @@ HumanChain (by @Jonta254 — a World mini-app in active development, Worldcoin D
 The following points are where the HumanChain implementation context should sharpen the spec (Brian's review):
 
 1. **Action registration mechanics.** Whether OP registers `observer-protocol-agent-link` under its own `app_id` or needs separate registrations per OP product surface — and whether the portal imposes constraints that bear on the OP-global invariant (§3).
-2. **`app_id` semantics across OP surfaces.** Confirming a single `app_id` can cover Sovereign, the enterprise surface, and `agenticterminal.ai` without re-fragmenting the nullifier (§3 requirement 2).
+2. **`rp_id` semantics across OP surfaces.** Confirming a single OP-controlled `rp_id` can cover Sovereign, the enterprise surface, and `agenticterminal.ai` without re-fragmenting the nullifier — the nullifier is scoped to `(rp_id, action)`, so the `rp_id`, not the portal `app_id`, is what must stay constant across surfaces (§3 requirement 2).
 3. **Proof-generation UX for non-mini-app contexts.** Sovereign is a web app; the IDKit→World App handoff may have different friction characteristics than the in-app mini-app flow Brian has built (§5).
 4. **Verifier reliability and latency.** Off-chain verifier SDK behaviour under real conditions (rate limits, downtime) before Sovereign goes live (§7).
 5. **Portal-submission constraints** that should shape the binding flow or schema.
@@ -341,14 +364,16 @@ A first bind (no `priorBindingId`), verified off-chain, issued by Observer Proto
     "id": "did:web:observerprotocol.org:agents:example-agent",
     "humanSubject": "did:web:example-principal.id",
     "worldIdNullifier": "0x2a3f...<nullifier-hash>",
+    "worldIdRpId": "rp_181fddac15a80f71",
     "worldIdAction": "observer-protocol-agent-link",
-    "worldIdAppId": "app_<placeholder-pending-humanchain-portal-clearance>",
+    "worldIdAppId": "app_0a7331ee5fd466ed5452e57ce01b587a",
     "verificationPath": "off-chain",
+    "proofType": "action_proof",
     "verifiedAt": "2026-06-06T14:00:00Z",
     "priorBindingId": null
   },
   "credentialSchema": {
-    "id": "https://observerprotocol.org/schemas/worldid-linkage/v1.json",
+    "id": "https://observerprotocol.org/schemas/worldid-linkage/v2.json",
     "type": "JsonSchema"
   },
   "credentialStatus": [
@@ -380,13 +405,15 @@ A re-bind after revocation is identical except for a new `id`, a later `verified
     "id": "did:web:observerprotocol.org:agents:example-agent",
     "humanSubject": "did:web:example-principal.id",
     "worldIdNullifier": "0x2a3f...<same-nullifier-as-before>",
+    "worldIdRpId": "rp_181fddac15a80f71",
     "worldIdAction": "observer-protocol-agent-link",
-    "worldIdAppId": "app_<placeholder-pending-humanchain-portal-clearance>",
+    "worldIdAppId": "app_0a7331ee5fd466ed5452e57ce01b587a",
     "verificationPath": "off-chain",
+    "proofType": "session_proof",
     "verifiedAt": "2026-07-01T09:30:00Z",
     "priorBindingId": "urn:uuid:worldid-linkage-example-v09-demo"
   }
 }
 ```
 
-The nullifier is identical across the original and the re-bind because the action is OP-global (§3); the `priorBindingId` reference makes the re-bind distinguishable from a fresh bind and preserves the audit trail (§6). The placeholder `worldIdAppId` is replaced with the live value once HumanChain's portal submission clears (§13).
+The nullifier is identical across the original and the re-bind because OP **re-asserts the stored canonical nullifier** via a session proof (§5.5, §6) — it is not re-proven, since the one-time action proof cannot be re-run; the re-bind is issued with `proofType: "session_proof"`. The `priorBindingId` reference makes the re-bind distinguishable from a fresh bind and preserves the audit trail (§6). `worldIdRpId` is the nullifier's namespace anchor (§3); `worldIdAppId` is the portal/config identifier and does not scope the nullifier. The examples use OP's live `rp_id` / `app_id`; any remaining portal-registration confirmation is tracked in §13.
