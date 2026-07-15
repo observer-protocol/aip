@@ -287,19 +287,15 @@ A conforming v0.9 implementation:
 
 ## 13. Reference implementation and open items
 
-HumanChain (by @Jonta254 — a World mini-app in active development, Worldcoin Developer Portal submission in progress) is the first reference implementation target. Once HumanChain's portal submission clears, this section will be updated with:
+HumanChain (by @Jonta254 — a World mini-app in active development) is the first reference implementation. HumanChain's Worldcoin Developer Portal submission has cleared: the World ID RP registration is **registered** on both mainnet and staging, with a live `app_id`. OP separately registered its own relying party per requirement 2 of §3 — `worldIdRpId: rp_181fddac15a80f71`, `worldIdAppId: app_0a7331ee5fd466ed5452e57ce01b587a` — and these are the real values used throughout this spec and in the Appendix B worked examples. The `worldIdAppId` field is no longer a placeholder.
 
-- The live Worldcoin `app_id` (the `worldIdAppId` value carried by issued bindings is a **placeholder pending portal clearance** until then).
-- The concrete action registration verifiable in the portal.
-- A worked example of an agent operating on behalf of a HumanChain-verified human.
+Status of the points raised in Brian's review:
 
-The following points are where the HumanChain implementation context should sharpen the spec (Brian's review):
-
-1. **Action registration mechanics.** Whether OP registers `observer-protocol-agent-link` under its own `app_id` or needs separate registrations per OP product surface — and whether the portal imposes constraints that bear on the OP-global invariant (§3).
-2. **`rp_id` semantics across OP surfaces.** Confirming a single OP-controlled `rp_id` can cover Sovereign, the enterprise surface, and `agenticterminal.ai` without re-fragmenting the nullifier — the nullifier is scoped to `(rp_id, action)`, so the `rp_id`, not the portal `app_id`, is what must stay constant across surfaces (§3 requirement 2).
-3. **Proof-generation UX for non-mini-app contexts.** Sovereign is a web app; the IDKit→World App handoff may have different friction characteristics than the in-app mini-app flow Brian has built (§5).
-4. **Verifier reliability and latency.** Off-chain verifier SDK behaviour under real conditions (rate limits, downtime) before Sovereign goes live (§7).
-5. **Portal-submission constraints** that should shape the binding flow or schema.
+1. **Action registration mechanics — resolved.** OP registers `observer-protocol-agent-link` under its own OP-controlled `app_id`/`rp_id` (§3, §5.5), not per OP product surface. HumanChain remains the surface app and routes proofs through OP's binding endpoint (§A.1) rather than verifying independently.
+2. **`rp_id` semantics across OP surfaces — specified, partially confirmed.** §3 requirement 2 normatively fixes a single OP-controlled `rp_id` for all OP surfaces. This is live and verified for Sovereign. It remains to be confirmed operationally as the enterprise surface and `agenticterminal.ai` come online, that they present under the same `rp_id` rather than registering their own.
+3. **Proof-generation UX for non-mini-app contexts — still open.** Sovereign's web-app IDKit→World App handoff (QR/deep-link vs. the native in-app mini-app prompt) has not yet been folded into §5, despite being flagged for this. Tracking as an open item until that friction note lands.
+4. **Verifier reliability and latency — still open.** Off-chain verifier SDK behaviour under real conditions (rate limits, downtime) has not yet been characterized ahead of Sovereign going live (§7).
+5. **Portal-submission constraints — resolved.** No constraints from the Worldcoin Developer Portal registration process ended up shaping the binding flow or schema beyond what §2–§9 already specify.
 
 ---
 
@@ -416,4 +412,26 @@ A re-bind after revocation is identical except for a new `id`, a later `verified
 }
 ```
 
-The nullifier is identical across the original and the re-bind because OP **re-asserts the stored canonical nullifier** via a session proof (§5.5, §6) — it is not re-proven, since the one-time action proof cannot be re-run; the re-bind is issued with `proofType: "session_proof"`. The `priorBindingId` reference makes the re-bind distinguishable from a fresh bind and preserves the audit trail (§6). `worldIdRpId` is the nullifier's namespace anchor (§3); `worldIdAppId` is the portal/config identifier and does not scope the nullifier. The examples use OP's live `rp_id` / `app_id`; any remaining portal-registration confirmation is tracked in §13.
+The nullifier is identical across the original and the re-bind because OP **re-asserts the stored canonical nullifier** via a session proof (§5.5, §6) — it is not re-proven, since the one-time action proof cannot be re-run; the re-bind is issued with `proofType: "session_proof"`. The `priorBindingId` reference makes the re-bind distinguishable from a fresh bind and preserves the audit trail (§6). `worldIdRpId` is the nullifier's namespace anchor (§3); `worldIdAppId` is the portal/config identifier and does not scope the nullifier. The examples use OP's live `rp_id` / `app_id`.
+
+A **second agent bound by the same human** is not a re-bind: it is a *first* bind for that agent (`priorBindingId: null`), but since the human's action-proof nullifier was already consumed at the first agent's bind, it is issued via a session proof rather than a fresh action proof:
+
+```json
+{
+  "id": "urn:uuid:worldid-linkage-example-v09-second-agent",
+  "credentialSubject": {
+    "id": "did:web:observerprotocol.org:agents:example-agent-two",
+    "humanSubject": "did:web:example-principal.id",
+    "worldIdNullifier": "0x2a3f...<same-nullifier-as-before>",
+    "worldIdRpId": "rp_181fddac15a80f71",
+    "worldIdAction": "observer-protocol-agent-link",
+    "worldIdAppId": "app_0a7331ee5fd466ed5452e57ce01b587a",
+    "verificationPath": "off-chain",
+    "proofType": "session_proof",
+    "verifiedAt": "2026-07-10T11:15:00Z",
+    "priorBindingId": null
+  }
+}
+```
+
+Note the combination that makes this case distinct from both examples above: `priorBindingId` is `null` (it is a first bind — for `example-agent-two`, not a re-bind of `example-agent`), yet `proofType` is `session_proof`, not `action_proof` (the human's one-time action-proof nullifier for `(rp_id, action)` was already spent binding `example-agent`, so this bind is OP re-asserting that same nullifier from session state, per §5.5). `priorBindingId` alone cannot distinguish this from the first worked example above; `proofType` is what carries that distinction, which is why it is a normative field in the credential body (§2.2, §5.5) rather than something a verifier could infer.
