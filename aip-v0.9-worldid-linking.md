@@ -141,6 +141,8 @@ Normative requirements:
 2. Proof generation MUST occur on-device in World App (steps 2–3). OP MUST NOT request, receive, or reconstruct the `identity_secret`.
 3. Verification (step 6) MUST succeed before the credential is issued. A binding credential MUST NOT be issued for an unverified or failed proof.
 
+**Surface friction: mini-app vs. external web app.** Proof-generation friction depends on where the human initiates linking. In an in-World-App mini-app context the IDKit prompt is native to World App and near-zero friction: the human is already inside the app, holding their World ID, and confirms in place. An external web app cannot invoke World App inline. On desktop it renders a QR code the human scans with their phone; on mobile it hands off via a deep link. Either path requires the human to have their phone with World App present to complete the proof. The reference Sovereign implementation is an external web app and takes the QR/deep-link route; the binding flow (steps 1 to 8) and the issued credential are identical across both surfaces, only the on-device handoff in steps 2 to 4 differs.
+
 ### 5.5 Proof model: one action proof, then session proofs (World ID 4.0)
 
 World ID 4.0 makes nullifiers strictly **one-time-use** per `(rp_id, action)`. This shapes how binding and re-binding work, and is the load-bearing constraint for §6.
