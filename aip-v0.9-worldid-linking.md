@@ -209,6 +209,8 @@ Normative requirements:
 2. Off-chain is the default for the initial bind. On-chain verification is available as an option for verifiers downstream who require stronger guarantees, but is not required for the initial bind.
 3. A verifier consuming a binding MAY apply policy based on `verificationPath` (e.g. require `on-chain` for high-value flows). This is a verifier-policy decision (v0.6 §6.2), outside protocol scope.
 
+**Verifier reliability and path selection.** Off-chain verification via the World Developer Portal endpoint (above) is the default: lower latency and operationally simpler, which suits the interactive link-on-first-use flow. On-chain verification of the Semaphore proof on World Chain is the trustless fallback for verifiers that require it, at the cost of latency and gas. Because the path actually used is recorded in the credential body (`verificationPath`, §2.2), a verifier can read it to weigh each binding's trust level rather than relying on an out-of-band claim, and OP can migrate its default verification path over time without re-issuing existing bindings: every credential self-describes how it was verified, so bindings issued under different paths remain individually interpretable side by side.
+
 ---
 
 ## 8. Placement in the attestation taxonomy
