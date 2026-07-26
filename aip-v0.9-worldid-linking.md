@@ -1,8 +1,8 @@
 # Agentic Identity Protocol — Specification v0.9
 
 **Observer Protocol**
-**Status:** Draft 1 — published for technical review
-**Date:** June 2026
+**Status:** Ratified 2026-07-25 (review record: [PR #1](https://github.com/observer-protocol/aip/pull/1))
+**Date:** June 2026 (draft), July 2026 (ratified)
 **Co-designer:** @Jonta254 (HumanChain reference implementation)
 
 This document extends [AIP v0.8](./aip-v0.8-draft-1.md), which extends [v0.7](./aip-v0.7-draft-1.md) and [v0.6](./aip-v0.6-draft-1.md). v0.9 adds one thing on top of v0.8:
