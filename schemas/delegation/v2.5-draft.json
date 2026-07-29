@@ -386,6 +386,146 @@
                 }
               },
               "x-opUnavailableInput": "deny"
+            },
+            "approvers": {
+              "type": "object",
+              "description": "Keys permitted to approve a request that escalation routes to a human. Named by the ISSUER, in the credential: the principal decides who may approve on their behalf, and it must not be settable by the operator or the agent or the control is decorative. Distinct from the credential's own issuer, which is what lets a designated operator key satisfy a mandate issued by an offline principal DID. CRITICAL: an evaluator that ignores this accepts approvals from anyone.",
+              "additionalProperties": false,
+              "required": [
+                "keys"
+              ],
+              "properties": {
+                "keys": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "assurance"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^did:[a-z0-9]+:.+",
+                        "description": "Approver DID, optionally with a #verification-method fragment. A DID rather than a raw key so an approver can be rotated and revoked through the same machinery as everything else, and so the key is resolvable rather than pinned."
+                      },
+                      "assurance": {
+                        "type": "string",
+                        "enum": [
+                          "operator-held",
+                          "device-bound"
+                        ],
+                        "description": "How strongly the approver key's provenance is established, as a CONSTRAINT rather than a label. `operator-held` needs only DID resolution and signature verification and is honourable today. `device-bound` requires verifying the key IS device-bound, which needs enrolment to have published something checkable into the DID document, and therefore requires the approval.assurance-verification capability: an evaluator without it must refuse the CREDENTIAL rather than accept an approval whose provenance it cannot check. Asymmetric by design."
+                      }
+                    }
+                  }
+                },
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 1,
+                  "description": "Approvals required. Reserved at 1 now because M-of-N will be wanted and a threshold added later costs a new schema version."
+                }
+              },
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "approval.channel"
+            },
+            "escalationThreshold": {
+              "type": "object",
+              "description": "Above this, a payment is routed to a human approver rather than auto-approved. RELOCATED from authorizationConfig.policy.escalation_threshold, where the engine emitted a NOTE and never denied, silently auto-approving the whole band between the threshold and the per-transaction ceiling. It lives here because actionScope is one of only two enumerated surfaces where an unknown key fails closed; authorizationConfig's internal keys are not enumerated, so a constraint placed there can be silently ignored. Zero issued credentials carried the old field when this moved.",
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "currency"
+              ],
+              "properties": {
+                "amount": {
+                  "type": "string",
+                  "pattern": "^\\d+(\\.\\d+)?$"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              },
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "approval.channel"
+            },
+            "approvalBudget": {
+              "type": "object",
+              "description": "A velocity cap on the principal's ATTENTION rather than on funds: how many approval requests an agent may raise in a window, and how many may be outstanding at once. Carried in the credential the principal already signs, so the deciding layer sits above the tool schema. Draw is non-refundable on expiry: an ignored request still cost attention.",
+              "additionalProperties": false,
+              "required": [
+                "maxPerWindow",
+                "window"
+              ],
+              "properties": {
+                "maxPerWindow": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "window": {
+                  "type": "string",
+                  "description": "ISO-8601 duration."
+                },
+                "maxOutstanding": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Simultaneously pending requests, distinct from the rate limit."
+                }
+              },
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "approval.budget-accounting"
+            },
+            "approvalRedemption": {
+              "type": "object",
+              "description": "How an approval binds to the payment it authorises. Approval is necessary and never sufficient: velocity may have been exhausted while the request sat pending, so the mandate is re-evaluated at redemption rather than blindly honoured. Request identity derives from verdict-layer facts only, never from agent-supplied text, or an agent perturbs a word to mint a fresh identity and escape a denial.",
+              "additionalProperties": false,
+              "required": [
+                "ttl",
+                "reevaluateAtRedemption"
+              ],
+              "properties": {
+                "ttl": {
+                  "type": "string",
+                  "description": "ISO-8601 duration. Mandatory."
+                },
+                "reevaluateAtRedemption": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "bindsTo": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "payee",
+                      "amountBand",
+                      "rail",
+                      "constraintBreached"
+                    ]
+                  },
+                  "description": "Verdict-layer facts the approval is bound to. Agent-supplied text is not admissible here."
+                }
+              },
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "approval.redemption-binding"
+            },
+            "requestIdentity": {
+              "type": "object",
+              "description": "The derivation a verifier must use to compute request identity, named by VERSIONED IDENTIFIER rather than as an inline formula so it can evolve without a schema version. Declared in the credential rather than agreed between implementations, because a shared document binds only implementations we write and portability is the property this protocol differentiates on: two engines computing different identities for one logical request reopens the perturbation escape silently.",
+              "additionalProperties": false,
+              "required": [
+                "algorithm"
+              ],
+              "properties": {
+                "algorithm": {
+                  "type": "string",
+                  "pattern": "^op-rid-v[0-9]+$"
+                }
+              },
+              "x-opUnavailableInput": "deny"
             }
           },
           "additionalProperties": false
@@ -475,6 +615,12 @@
               "items": {
                 "type": "string"
               }
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Maximum further delegation depth. may_delegate_further is a boolean and cannot express depth or attenuation; reserved now because adding it later costs a schema version.",
+              "x-opUnavailableInput": "deny"
             }
           }
         },
@@ -1024,6 +1170,247 @@
             }
           },
           "$comment": "tradingMandate.counterparty.requireIssuerClassIn has no data source in any shipped evaluator; it denies unconditionally today. Declaring the capability makes an evaluator without it refuse the CREDENTIAL once, instead of refusing every PAYMENT."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "approvers"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "approval.channel"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.approvers is unevaluable without approval.channel."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "escalationThreshold"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "approval.channel"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.escalationThreshold is unevaluable without approval.channel."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "approvalBudget"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "approval.budget-accounting"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.approvalBudget is unevaluable without approval.budget-accounting."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "approvalRedemption"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "approval.redemption-binding"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.approvalRedemption is unevaluable without approval.redemption-binding."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "escalationThreshold"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "approvers"
+                ]
+              }
+            }
+          },
+          "$comment": "escalationThreshold routes to a human, so a mandate carrying it must name who may approve. Without approvers every payment in the band denies with no path forward."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "approvers"
+                ],
+                "properties": {
+                  "approvers": {
+                    "properties": {
+                      "keys": {
+                        "contains": {
+                          "properties": {
+                            "assurance": {
+                              "const": "device-bound"
+                            }
+                          },
+                          "required": [
+                            "assurance"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "actionScope": {
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "approval.assurance-verification"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "An operator-held approver needs only DID resolution and signature verification. A device-bound one requires verifying the key IS device-bound, which is not honourable until enrolment publishes something checkable."
         }
       ]
     },
