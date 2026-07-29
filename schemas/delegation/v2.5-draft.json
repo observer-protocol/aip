@@ -679,21 +679,73 @@
             },
             "counterparty": {
               "type": "object",
-              "description": "AIP v0.8 \u2014 counterparty controls. See aip-v0.8-draft-1.md \u00a72.1.",
+              "description": "AIP v0.8 \u00a72.1, extended in draft-2: counterparty entries may be the legacy string or a typed {kind, value}. See the item description for why the object is closed and the kind is not.",
               "properties": {
                 "allowList": {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Legacy form, unchanged: a rail address, or a DID expanded through the verifier's counterpartyAddressMap. Every credential issued against v2.1/v2.3/v2.4 uses this and keeps working. Interpreted exactly as before."
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "value"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                            "description": "What sort of identifier `value` is. A PATTERN-CONSTRAINED STRING, deliberately NOT an enum: a card rail names its counterparty by merchant descriptor and MCC, an issuer-native rail will name it some third way, and a new kind must not require a new schema version. Same discipline as capability names. The vocabulary of recognized kinds lives in the engine and is exported as data; an UNRECOGNIZED kind DENIES, so the open vocabulary is not an open door. Kinds recognized today: address, did."
+                          },
+                          "value": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ],
+                    "description": "Either the legacy string form or a typed {kind, value}. The OBJECT is closed, so no third property can appear; the KIND is open, so the identifier vocabulary can grow. A card counterparty has no address, so a bare string cannot express it, and the constraint a finance team cares most about (which merchants may this agent pay) has no representation on the rail a finance team uses without this."
                   },
-                  "description": "Closed list of permitted counterparties. Entries SHOULD be DIDs; raw rail-specific addresses accepted as fallback."
+                  "description": "Closed list of permitted counterparties.",
+                  "x-opUnavailableInput": "deny"
                 },
                 "blockList": {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Legacy form, unchanged: a rail address, or a DID expanded through the verifier's counterpartyAddressMap. Every credential issued against v2.1/v2.3/v2.4 uses this and keeps working. Interpreted exactly as before."
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "value"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                            "description": "What sort of identifier `value` is. A PATTERN-CONSTRAINED STRING, deliberately NOT an enum: a card rail names its counterparty by merchant descriptor and MCC, an issuer-native rail will name it some third way, and a new kind must not require a new schema version. Same discipline as capability names. The vocabulary of recognized kinds lives in the engine and is exported as data; an UNRECOGNIZED kind DENIES, so the open vocabulary is not an open door. Kinds recognized today: address, did."
+                          },
+                          "value": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ],
+                    "description": "Either the legacy string form or a typed {kind, value}. The OBJECT is closed, so no third property can appear; the KIND is open, so the identifier vocabulary can grow. A card counterparty has no address, so a bare string cannot express it, and the constraint a finance team cares most about (which merchants may this agent pay) has no representation on the rail a finance team uses without this."
                   },
-                  "description": "Closed list of denied counterparties. DID or address strings."
+                  "description": "Closed list of denied counterparties. A blocklist that cannot identify the counterparty correctly does nothing, which is why its unavailable-input disposition differs from the allowlist's.",
+                  "x-opUnavailableInput": "ignore"
                 },
                 "requireIssuerClassIn": {
                   "type": "array",
