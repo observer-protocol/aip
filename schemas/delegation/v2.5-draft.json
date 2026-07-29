@@ -565,7 +565,7 @@
                 }
               },
               "x-opUnavailableInput": "deny",
-              "x-opRequiresCapability": "counterparty.issuer-class-attestation"
+              "$comment": "allowList/blockList need no capability: address matching is implementable and implemented. Only requireIssuerClassIn requires counterparty.issuer-class-attestation, and the coupling is on that sub-field."
             },
             "temporal": {
               "type": "object",
@@ -632,7 +632,8 @@
                 }
               },
               "x-opUnavailableInput": "deny",
-              "x-opRequiresCapability": "velocity.window"
+              "x-opRequiresCapability": "velocity.window",
+              "$comment": "Requires velocity.window:<ISO-8601 duration> matching each declared window. Parameterised, so the coupling is normative in AIP v0.8 draft-2 rather than a single const here."
             },
             "crossRailBudget": {
               "type": "object",
@@ -815,86 +816,214 @@
         {
           "if": {
             "properties": {
-              "authorizationLevel": {
-                "const": "one-time"
+              "actionScope": {
+                "required": [
+                  "cumulative_budget"
+                ]
               }
             },
             "required": [
-              "authorizationLevel"
+              "actionScope"
             ]
           },
           "then": {
+            "required": [
+              "actionScope"
+            ],
             "properties": {
-              "authorizationConfig": {
+              "actionScope": {
                 "required": [
-                  "oneTime"
+                  "requiredEnforcement"
                 ],
                 "properties": {
-                  "recurring": false,
-                  "policy": false
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "budget.period-accounting"
+                        }
+                      }
+                    }
+                  }
                 }
               }
-            },
-            "required": [
-              "authorizationConfig"
-            ]
-          }
+            }
+          },
+          "$comment": "actionScope.cumulative_budget is unevaluable without budget.period-accounting. The credential must declare it, in the credential, because engines never dereference this schema."
         },
         {
           "if": {
             "properties": {
-              "authorizationLevel": {
-                "const": "recurring"
+              "actionScope": {
+                "required": [
+                  "geographicAllowedOnly"
+                ]
               }
             },
             "required": [
-              "authorizationLevel"
+              "actionScope"
             ]
           },
           "then": {
+            "required": [
+              "actionScope"
+            ],
             "properties": {
-              "authorizationConfig": {
+              "actionScope": {
                 "required": [
-                  "recurring"
+                  "requiredEnforcement"
                 ],
                 "properties": {
-                  "oneTime": false,
-                  "policy": false
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "jurisdiction.resolution"
+                        }
+                      }
+                    }
+                  }
                 }
               }
-            },
-            "required": [
-              "authorizationConfig"
-            ]
-          }
+            }
+          },
+          "$comment": "actionScope.geographicAllowedOnly is unevaluable without jurisdiction.resolution. The credential must declare it, in the credential, because engines never dereference this schema."
         },
         {
           "if": {
             "properties": {
-              "authorizationLevel": {
-                "const": "policy"
+              "tradingMandate": {
+                "required": [
+                  "crossRailBudget"
+                ]
               }
             },
             "required": [
-              "authorizationLevel"
+              "tradingMandate"
             ]
           },
           "then": {
+            "required": [
+              "actionScope"
+            ],
             "properties": {
-              "authorizationConfig": {
+              "actionScope": {
                 "required": [
-                  "policy"
+                  "requiredEnforcement"
                 ],
                 "properties": {
-                  "oneTime": false,
-                  "recurring": false
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "ledger.shared-counter"
+                        }
+                      }
+                    }
+                  }
                 }
+              }
+            }
+          },
+          "$comment": "tradingMandate.crossRailBudget is unevaluable without ledger.shared-counter. The credential must declare it, in the credential, because engines never dereference this schema."
+        },
+        {
+          "if": {
+            "properties": {
+              "tradingMandate": {
+                "required": [
+                  "geographicAllowedOnly"
+                ]
               }
             },
             "required": [
-              "authorizationConfig"
+              "tradingMandate"
             ]
-          }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "jurisdiction.resolution"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "tradingMandate.geographicAllowedOnly is unevaluable without jurisdiction.resolution. The credential must declare it, in the credential, because engines never dereference this schema."
+        },
+        {
+          "if": {
+            "required": [
+              "tradingMandate"
+            ],
+            "properties": {
+              "tradingMandate": {
+                "required": [
+                  "counterparty"
+                ],
+                "properties": {
+                  "counterparty": {
+                    "required": [
+                      "requireIssuerClassIn"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "counterparty.issuer-class-attestation"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "tradingMandate.counterparty.requireIssuerClassIn has no data source in any shipped evaluator; it denies unconditionally today. Declaring the capability makes an evaluator without it refuse the CREDENTIAL once, instead of refusing every PAYMENT."
         }
       ]
     },
@@ -990,5 +1119,6 @@
       }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$comment": "Capability NAMES are deliberately not enumerated anywhere in this schema. The capabilities array is format-constrained only, and the registry of names is a separate mutable document. Adding a capability must never require a new schema version, or the mechanism that makes this the last mandatory fleet lockstep defeats itself. Engines never dereference this document at runtime: they declare the strings they implement and compare by exact equality."
 }

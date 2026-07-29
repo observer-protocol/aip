@@ -26,6 +26,30 @@ The W3C VC Data Model treats `credentialSchema.id` as a pointer to a stable, add
 - **Spec and adapter pinning.** AIP draft documents reference schema URLs by exact version (no floating "latest" link). Downstream adapters (e.g. WDK integration) SHOULD pin the expected `credentialSchema.id` to a specific URL they were built against, and SHOULD reject credentials carrying a `credentialSchema.id` they do not recognise rather than fetching arbitrary URLs.
 - **Schema-source repository.** Schema documents are authored in this repository (`observer-protocol/aip`) under `schemas/<credential-type>/<version>.json`, and are the single source of truth. Deployment to `observer-protocol/observerprotocol-website` under `schemas/` is a **verbatim byte-for-byte copy** — the deployed file and its `aip` source MUST be identical (same `sha256`). The served `$id` therefore always matches the file's own `$id`. No edits are made on the website side; any change starts in `aip`.
 
+## When the source and the published bytes disagree
+
+**The served bytes win, and the canonical source is corrected to match.**
+
+Immutability inverts the usual direction. The repository is normally authoritative over what
+gets deployed; it is *not* authoritative over a document whose URL can never change and which
+issued credentials already reference. Publishing the repo copy over a divergent served file
+would silently replace an artifact that signed credentials point at, which is the one outcome
+this policy exists to prevent.
+
+So the repair for a missing or divergent source is a **byte-identical backfill from the served
+URL**, verified by `sha256`, with the file's own `$id` checked against the URL it was fetched
+from. Never the reverse.
+
+Applied 2026-07-28 to `v2.2.json` and `v2.4.json`, which were live, referenced by issued
+credentials, present in shipped adapter allowlists, and absent from this repository. The
+instinct in that moment is to push the repo copy and call it a fix; that would have been a
+silent replacement.
+
+**The mechanism, not just the instances.** The schema-versus-engine conformance check carries
+a row for this: *for every schema URL appearing in any shipped allowlist, a byte-identical
+source exists in this repository.* It runs against served URLs, like the other rows, and it
+would have caught both.
+
 ## Cross-references
 
 - AIP v0.8 draft-1 §1 (the v0.7→v0.8 transition that first applied this policy).
