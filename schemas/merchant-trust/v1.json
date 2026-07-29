@@ -1,0 +1,210 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://observerprotocol.org/schemas/merchant-trust/v1.json",
+  "title": "Merchant Trust Credential Schema v1",
+  "description": "JSON Schema for MerchantTrustCredential issued by Observer Protocol on behalf of the Agentic Terminal Directory. A signed, portable W3C VC asserting a merchant's AT trust tier. Verifiable against the OP issuer DID document with no authenticated AT API call. Schema is immutable at this URL per the OP schema immutability policy (see aip repo SCHEMA_POLICY.md). New versions publish at new URLs.",
+  "type": "object",
+  "required": [
+    "@context",
+    "id",
+    "type",
+    "issuer",
+    "validFrom",
+    "validUntil",
+    "credentialSchema",
+    "credentialStatus",
+    "credentialSubject",
+    "proof"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "@context": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "type": "string" },
+      "allOf": [
+        { "contains": { "const": "https://www.w3.org/ns/credentials/v2" } },
+        { "contains": { "const": "https://observerprotocol.org/contexts/v1" } }
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^https://|^urn:uuid:",
+      "description": "Stable URL at which this credential is served. Convention: https://agenticterminal.ai/merchants/<id>/trust-credential.jsonld"
+    },
+    "type": {
+      "type": "array",
+      "minItems": 2,
+      "allOf": [
+        { "contains": { "const": "VerifiableCredential" } },
+        { "contains": { "const": "MerchantTrustCredential" } }
+      ]
+    },
+    "issuer": {
+      "type": "string",
+      "pattern": "^did:web:[^/\\s]+$",
+      "description": "Observer Protocol issuer DID. Expected: did:web:observerprotocol.org. Must be a did:web DID with no slash in the DID string itself."
+    },
+    "validFrom": { "type": "string", "format": "date-time" },
+    "validUntil": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiry. Recommended 90-day validity for Phase 1 credentials to limit status-list growth."
+    },
+    "credentialSchema": {
+      "type": "object",
+      "required": ["id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "const": "https://observerprotocol.org/schemas/merchant-trust/v1.json" },
+        "type": { "const": "JsonSchema" }
+      }
+    },
+    "credentialStatus": {
+      "type": "object",
+      "required": ["id", "type", "statusPurpose", "statusListIndex", "statusListCredential"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uri",
+          "description": "Unique URL for this status entry. Convention: <statusListCredential>#<statusListIndex>"
+        },
+        "type": { "const": "BitstringStatusListEntry" },
+        "statusPurpose": { "const": "revocation" },
+        "statusListIndex": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Integer index (as string) in the status list bitstring. Index 0 is reserved as a sentinel and is never issued."
+        },
+        "statusListCredential": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the BitstringStatusListCredential. Convention: https://agenticterminal.ai/status/merchant-trust/v1"
+        }
+      }
+    },
+    "credentialSubject": {
+      "type": "object",
+      "required": ["id", "trustTier", "tierBasis", "directoryId", "directoryUrl", "railsAccepted", "issuedByDirectory"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^did:[a-z]+:[^/\\s#?]+$",
+          "description": "Merchant DID. No slashes in the DID string — path segments are colon-separated. Default for AT-hosted: did:web:agenticterminal.ai:merchants:<directoryId>. Resolves to https://agenticterminal.ai/merchants/<directoryId>/did.json (colons map to slashes in the resolved URL only). Optional: merchant-controlled DID if the merchant holds a key and provided it."
+        },
+        "trustTier": {
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "description": "Merchant trust tier at issuance. 1 = directory-listed (AT operator assigned). 2 = verified (backed by CounterpartyAttestationCredentials with settlement evidence). 3 = chain-anchored (AT-OP v1.x, not yet active). The tierBasis field makes the evidentiary basis explicit — trust tier alone is not sufficient to determine how a credential was earned."
+        },
+        "tierBasis": {
+          "type": "string",
+          "enum": ["at-directory-listing", "verified-attestations"],
+          "description": "Evidentiary basis for trustTier at issuance. 'at-directory-listing': tier 1 only; directory operator assigned this tier; no transaction evidence exists; transactionEvidenceBucket MUST be null and attestationSetRef MUST be null. 'verified-attestations': tier 2 or 3; this tier is backed by verifiable CounterpartyAttestationCredentials; transactionEvidenceBucket MUST be non-null and attestationSetRef MUST be a non-empty array. A verifier MUST check tierBasis matches the evidence structure — a credential with tierBasis 'at-directory-listing' and trustTier 2 is mis-issued."
+        },
+        "directoryId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+          "description": "Stable AT Directory slug. Ties this credential to the directory record."
+        },
+        "directoryUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Canonical AT Directory listing URL for this merchant."
+        },
+        "issuedByDirectory": {
+          "type": "string",
+          "format": "uri",
+          "description": "The AT Directory instance that asserted this tier. Expected: https://agenticterminal.ai"
+        },
+        "railsAccepted": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["lightning", "bolt12", "l402", "usdt", "btc", "fiat"]
+          },
+          "description": "Payment rails accepted at time of issuance. 'fiat' covers any non-crypto settlement (bank transfer, cash, card, etc.) and is advisory-only: fiat transactions cannot carry a cryptographic settlementAnchor, so their CounterpartyAttestationCredentials cannot contribute to tier upgrades until the Sybil model for non-anchored attestations is resolved in Phase 3 (gated on Leo)."
+        },
+        "transactionEvidenceBucket": {
+          "type": ["string", "null"],
+          "enum": ["0", "1-10", "11-50", "51-250", "250+", null],
+          "description": "Bucketed distinct-transaction count backing this tier. No raw counts or PII. MUST be null when tierBasis is 'at-directory-listing'. MUST be non-null when tierBasis is 'verified-attestations'."
+        },
+        "attestationSetRef": {
+          "type": ["array", "null"],
+          "items": { "type": "string", "format": "uri" },
+          "description": "URIs of CounterpartyAttestationCredentials backing this trustTier. MUST be null when tierBasis is 'at-directory-listing'. MUST be a non-empty array when tierBasis is 'verified-attestations'. Null in all Phase 1 issuances.",
+          "default": null
+        },
+        "merchantControlledKeyRef": {
+          "type": ["string", "null"],
+          "description": "Optional. Fragment identifier of a merchant-controlled key in the merchant DID document (e.g. '#merchant-key-1'). When present, enables holder-binding and Phase 4 A2A mutual verification. Null for merchants using the AT-hosted default key only.",
+          "default": null
+        },
+        "continuityAnchor": {
+          "type": ["string", "null"],
+          "pattern": "^did:[a-z]+:[^/\\s#?]+$",
+          "description": "RESERVED. When populated, asserts that this credential subject (AT-hosted DID) is the same entity as the merchant-controlled DID named here. Null in all Phase 1 issuances. The bidirectional proof mechanism (DID doc alsoKnownAs, a DIDContinuityCredential, or VP equivalence claim) is deferred. HARD DEADLINE: the mechanism MUST be locked and live before any CounterpartyAttestationCredential is issued against an AT-hosted subject DID — once attestation history exists, migration without a continuity anchor loses it.",
+          "default": null
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "tierBasis": { "const": "at-directory-listing" } },
+            "required": ["tierBasis"]
+          },
+          "then": {
+            "properties": {
+              "trustTier": { "const": 1 },
+              "transactionEvidenceBucket": { "type": "null" },
+              "attestationSetRef": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "tierBasis": { "const": "verified-attestations" } },
+            "required": ["tierBasis"]
+          },
+          "then": {
+            "required": ["attestationSetRef", "transactionEvidenceBucket"],
+            "properties": {
+              "trustTier": { "enum": [2, 3] },
+              "transactionEvidenceBucket": { "type": "string" },
+              "attestationSetRef": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "proof": {
+      "type": "object",
+      "required": ["type", "cryptosuite", "created", "proofPurpose", "verificationMethod", "proofValue"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "DataIntegrityProof" },
+        "cryptosuite": { "const": "eddsa-jcs-2022" },
+        "created": { "type": "string", "format": "date-time" },
+        "proofPurpose": { "const": "assertionMethod" },
+        "verificationMethod": {
+          "type": "string",
+          "pattern": "^did:web:observerprotocol\\.org#key-6$",
+          "description": "MUST reference #key-6. Any other key fragment MUST cause verification failure. Guards against mis-scoped issuance from #key-5 (delegation) or #key-4 (World ID)."
+        },
+        "proofValue": {
+          "type": "string",
+          "pattern": "^z[a-zA-Z0-9]+$",
+          "description": "Multibase base58btc-encoded Ed25519 signature."
+        }
+      }
+    }
+  }
+}

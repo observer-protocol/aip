@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://observerprotocol.org/schemas/counterparty-attestation/v1-draft.json",
+  "title": "Counterparty Attestation Credential Schema v1 — DRAFT, NOT FOR ISSUANCE",
+  "description": "DRAFT ONLY. Do not issue credentials against this schema. This URL is not yet published and no credentials reference it. Shape reserved for Tier 2 design; Sybil resistance model is BLOCKING on Leo review before any live issuance. See AT Directory Portable Trust Decisions 2026-06-20.",
+  "x-status": "draft",
+  "x-issuance-gate": "BLOCKED — requires Leo sign-off on Sybil resistance model before any live CounterpartyAttestationCredential is issued",
+  "type": "object",
+  "required": [
+    "@context",
+    "id",
+    "type",
+    "issuer",
+    "validFrom",
+    "credentialSchema",
+    "credentialSubject",
+    "proof"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "@context": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "type": "string" },
+      "allOf": [
+        { "contains": { "const": "https://www.w3.org/ns/credentials/v2" } },
+        { "contains": { "const": "https://observerprotocol.org/contexts/v1" } }
+      ]
+    },
+    "id": { "type": "string", "pattern": "^https://|^urn:uuid:" },
+    "type": {
+      "type": "array",
+      "minItems": 2,
+      "allOf": [
+        { "contains": { "const": "VerifiableCredential" } },
+        { "contains": { "const": "CounterpartyAttestationCredential" } }
+      ]
+    },
+    "issuer": {
+      "type": "string",
+      "pattern": "^did:[a-z]+:.+",
+      "description": "The attesting agent's DID. NOT the OP issuer DID. An agent asserts this credential about a merchant after a transaction."
+    },
+    "validFrom": { "type": "string", "format": "date-time" },
+    "validUntil": { "type": ["string", "null"], "format": "date-time" },
+    "credentialSchema": {
+      "type": "object",
+      "required": ["id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "const": "https://observerprotocol.org/schemas/counterparty-attestation/v1.json" },
+        "type": { "const": "JsonSchema" }
+      }
+    },
+    "credentialSubject": {
+      "type": "object",
+      "required": ["id", "about", "transactionRef"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^did:[a-z]+:.+",
+          "description": "The attesting agent's own DID (self as subject — the attestation is the agent asserting a claim it can be held to)."
+        },
+        "about": {
+          "type": "string",
+          "pattern": "^did:[a-z]+:.+",
+          "description": "The merchant being attested. Must be the merchant's DID as it appears in the MerchantTrustCredential credentialSubject.id."
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["completed", "partial", "disputed"],
+          "description": "Transaction outcome from the attesting agent's perspective."
+        },
+        "transactionRef": {
+          "type": "object",
+          "required": ["rail", "amountBucket", "timestamp"],
+          "additionalProperties": false,
+          "description": "Settlement reference. No raw amounts or counterparty PII — buckets and provable anchors only.",
+          "properties": {
+            "rail": {
+              "type": "string",
+              "enum": ["lightning", "bolt12", "l402", "usdt", "btc", "fiat"],
+              "description": "'fiat' covers any non-crypto settlement (bank transfer, card, cash, etc.). Fiat attestations MUST have settlementAnchor: null and are advisory-only. They cannot contribute to trust-tier upgrades until the Sybil model for non-crypto-anchored attestations is resolved in Phase 3 (BLOCKING on Leo). See AT Directory Portable Trust Decisions 2026-06-20."
+            },
+            "amountBucket": {
+              "type": "string",
+              "enum": ["micro", "small", "medium", "large"],
+              "description": "Bucketed transaction size. Exact amounts are not recorded. Bucket definitions TBD in Tier 2 spec."
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Approximate transaction timestamp (rounded to hour for privacy)."
+            },
+            "settlementAnchor": {
+              "type": ["string", "null"],
+              "description": "RESERVED — the Sybil resistance anchor. Options under evaluation: Lightning preimage hash, on-chain txid, L402 receipt token. Mechanism locked pending Leo review. Null until decided; non-null once decided. A CounterpartyAttestation with a null settlementAnchor MUST be treated as advisory-only and MUST NOT contribute to tier upgrades."
+            }
+          }
+        },
+        "attestorStandingRef": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "RESERVED — URL of the attesting agent's own MerchantTrustCredential or PrincipalAttestationCredential, establishing the attestor's standing. Weighting by attestor standing is the second Sybil resistance mechanism under evaluation. Null until Sybil model is locked."
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "required": ["type", "cryptosuite", "created", "proofPurpose", "verificationMethod", "proofValue"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "DataIntegrityProof" },
+        "cryptosuite": { "const": "eddsa-jcs-2022" },
+        "created": { "type": "string", "format": "date-time" },
+        "proofPurpose": { "const": "assertionMethod" },
+        "verificationMethod": { "type": "string", "pattern": "^did:[a-z]+:.+" },
+        "proofValue": { "type": "string", "pattern": "^z[a-zA-Z0-9]+$" }
+      }
+    }
+  }
+}
