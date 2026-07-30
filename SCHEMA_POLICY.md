@@ -242,3 +242,29 @@ any *modification* to a published schema, since a publication adds a URL and nev
 
 **Whoever runs the next mint will not have this session's context.** That is the whole argument for
 turning each of these from an intention into a check.
+
+### Pending corrections: prose a later walk falsified, carried to the next mint
+
+A frozen schema's *mechanism* and its *description* can diverge, because a rail walk can falsify a
+characterisation without touching a constraint. **The bytes stay frozen and the correction waits for the
+next version that mints for an independent reason.** Minting a version to fix a sentence would freeze a
+second artifact to correct the prose of the first.
+
+The correction goes **beside** the record in the meantime: in the engine's vocabulary export, where an
+integrator reads recognized values, and in this list, so the next mint picks it up rather than someone
+rediscovering the discrepancy.
+
+**Carried into v2.6-draft (both applied there, both still wrong in v2.5 and staying that way):**
+
+- **`requiredPurchaseTerms`** described the artifact as *counterparty-signed*. Narrower than the
+  mechanism: on a claims payout the artifact is signed by the **payor**, who is neither the counterparty
+  nor the agent, while the counterparty is a claimant who signs nothing. The field always worked, because
+  the signer is a property of the artifact type and that vocabulary is open. Only the description was
+  wrong, and it cost no version to be wrong.
+- **`approvers`** enumerated *three known shapes* of duty-shaped field. The payout walk found a fourth
+  (monitoring). The count was correct when written.
+
+**The check that produced this list, worth repeating at every mint:** descriptions that COUNT things or
+CHARACTERISE a party are the ones a later walk can falsify. Both entries above were found by searching
+v2.5 for exactly those two patterns, after one of them had already surfaced by accident. **A pending list
+built incrementally from accidents is a list of what someone noticed.**
