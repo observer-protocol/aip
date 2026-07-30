@@ -160,3 +160,50 @@ Two halves of the fix, both required:
 
 The second half is the same lesson as reading identifiers rather than writing better predicates: the
 artifact knows things the author of the fixture does not.
+
+### Two checks, neither substituting for the other
+
+A **rail walkthrough** asks *what did we never consider*. A **conventions check** asks *where do we
+disagree with ourselves*. Both are cheap. Neither finds what the other finds.
+
+Six rails and one framework were walked for v2.5 and they found every scope error: consent artifacts,
+deadline duties, the destination gap, counterparty-stated terms. They found **neither** convention defect.
+
+The conventions check, written an hour before the mint, found two. Three fields using bare strings weeks
+after the draft settled on typed identifiers, and a **v2.4 title on the v2.5 schema** which on a frozen
+document would have been permanent.
+
+That retires the idea that walkthroughs were sufficient. They cannot see a vocabulary contradicting
+itself, because self-contradiction is invisible from outside: every field is individually defensible.
+
+**And the mechanism behind both defects is the same one: a fix does not propagate to work done after it.**
+The typed-identifier decision corrected its instance. The version bump corrected its instance. Neither
+prevented recurrence, because both lived in a decision rather than in a check. A convention that is not
+asserted is a convention only for as long as the person who set it is reviewing.
+
+### The mint commit is not the freeze. Publication is.
+
+Immutability attaches when the URL serves bytes. A schema committed to this repository and not yet
+deployed is still editable, and that window is the last chance to correct anything.
+
+Stated because v2.5 was described as minted while its `$id` still returned 404, and the distinction is
+easy to lose: the mint is the decision to close, publication is the act that makes closing permanent.
+**Verify the URL serves before treating a schema as frozen, and make final corrections before deploying,
+never after.**
+
+### When to close a schema, with the v2.5 evidence
+
+The argument for closing early is that fields have stopped arriving. It was made for v2.5 eight days
+before the mint. In those eight days the open draft absorbed:
+
+- **six fields**: `obligationUniqueness`, `reattemptAfterReturn`, `reversalHandling`,
+  `settlementDestinations`, `requiredPayerConsent`, `blockedPaymentNotice`, `requiredPurchaseTerms`
+- **two renames**: `payee` to `counterparty`, and the uniqueness window split from the finality window
+- **two convention defects**: bare-string identifiers, and a stale version title
+
+Every field came from walking a rail. **None came from reviewing the field list**, which is what the extra
+eight days would otherwise have been spent on. A rename in an open draft is free and a rename after the
+mint is a whole version.
+
+**The close condition is therefore not "have fields stopped arriving" but "have we walked every rail we
+intend to support, and does the schema agree with itself".** Both are answerable. "Has it settled" is not.
