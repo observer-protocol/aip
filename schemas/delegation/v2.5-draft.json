@@ -351,6 +351,41 @@
               "x-opUnavailableInput": "deny",
               "x-opRequiresCapability": "budget.period-accounting"
             },
+            "counterpartyVelocityCap": {
+              "type": "object",
+              "description": "Binding. Cumulative spend to ONE counterparty within a rolling window. CRITICAL: an evaluator that cannot attribute prior spend to a counterparty MUST refuse the credential rather than ignore the cap, on the same reasoning as cumulative_budget. Exists because per_transaction_ceiling is a control on the shape of a transaction and not on the size of an obligation: a ceiling of 25 does not stop an obligation of 100 being settled as four payments of 25, every one of which the mandate permits. Demonstrated behaviour, not a hypothetical — an agent given a 100 invoice under a ceiling of 25 split it into four and correctly reported that each payment was within the mandate. The gap is not rail-specific: max 2000 per booking does not stop four 500 legs, and max 200 per refund does not stop four 50 credits to one customer. Same-currency comparison only, no FX, per §1.2. Note the limit of this field: it approximates obligation identity by counterparty aggregation, which over-restricts a payee legitimately paid several times in a window and under-restricts an obligation split across payees. Obligation identity supplied by the payee is the stronger control and is deferred, because it requires the payee to participate.",
+              "properties": {
+                "amount": {
+                  "type": "string",
+                  "description": "Decimal amount as string."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "ISO 4217 code, token symbol, or rail-native unit. Same-currency comparison only; a prior spend in another currency is reported as uncountable rather than converted."
+                },
+                "window": {
+                  "type": "string",
+                  "pattern": "^P(?:\\d+D|T\\d+H)$",
+                  "description": "ISO-8601 duration, rolling backwards from the proposed action. Constrained to whole days or hours: finer granularity invites clock-skew disputes across hosts, and longer windows belong in cumulative_budget. A parameterised capability matches only its exact parameter, so an evaluator declaring velocity.counterparty:P1D does not satisfy a credential requiring P7D."
+                },
+                "matchOn": {
+                  "type": "string",
+                  "enum": [
+                    "mandate-identifier"
+                  ],
+                  "description": "Which identifier prior spend is aggregated by. Locked to the identifier the MANDATE matched, never the rail's own name for the same party: on a card those are different strings, and aggregating by the rail's version would leave the ledger holding something the mandate cannot read back. A future value for payee-supplied obligation identity is reserved rather than assumed."
+                }
+              },
+              "required": [
+                "amount",
+                "currency",
+                "window",
+                "matchOn"
+              ],
+              "additionalProperties": false,
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "velocity.counterparty"
+            },
             "geographicAllowedOnly": {
               "type": "array",
               "items": {
@@ -1051,6 +1086,47 @@
             }
           },
           "$comment": "actionScope.cumulative_budget is unevaluable without budget.period-accounting. The credential must declare it, in the credential, because engines never dereference this schema."
+        },
+        {
+          "if": {
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "counterpartyVelocityCap"
+                ]
+              }
+            },
+            "required": [
+              "actionScope"
+            ]
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "velocity.counterparty"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.counterpartyVelocityCap is unevaluable without velocity.counterparty: an evaluator that cannot attribute prior spend to a counterparty cannot enforce a cumulative cap on one. Declared in the credential rather than inferred, because engines never dereference this schema."
         },
         {
           "if": {
