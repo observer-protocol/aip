@@ -373,7 +373,7 @@
                   "enum": [
                     "mandate-identifier"
                   ],
-                  "description": "Which identifier prior spend is aggregated by. Locked to the identifier the MANDATE matched, never the rail's own name for the same party: on a card those are different strings, and aggregating by the rail's version would leave the ledger holding something the mandate cannot read back. A future value for payee-supplied obligation identity is reserved rather than assumed. CONSEQUENCE, STATED RATHER THAN LEFT TO BE DISCOVERED: if an adapter cannot resolve a rail's payee identity back to the identifier the mandate uses, prior spend cannot be attributed, the cap cannot be evaluated, and x-opUnavailableInput fires. That denies THE PAYMENT and not merely the aggregation, so an unmapped counterparty makes this mandate unusable for that payee until the mapping exists. This is the intended direction: a cumulative cap that silently stops applying to counterparties the adapter cannot name is a cap that the least identifiable counterparties escape."
+                  "description": "Which identifier prior spend is aggregated by. Locked to the identifier the MANDATE matched, never the rail's own name for the same party: on a card those are different strings, and aggregating by the rail's version would leave the ledger holding something the mandate cannot read back. A future value for payee-supplied obligation identity is reserved rather than assumed. CONSEQUENCE, STATED RATHER THAN LEFT TO BE DISCOVERED: if an adapter cannot resolve a rail's payee identity back to the identifier the mandate uses, prior spend cannot be attributed, the cap cannot be evaluated, and x-opUnavailableInput fires. That denies THE PAYMENT and not merely the aggregation, so an unmapped counterparty makes this mandate unusable for that payee until the mapping exists. This is the intended direction: a cumulative cap that silently stops applying to counterparties the adapter cannot name is a cap that the least identifiable counterparties escape. CROSS-REFERENCE: obligationUniqueness reserves the same payee-supplied identity from the other direction, as the non-forgeable version of an agent-supplied obligation reference. Whichever is built first should satisfy both rather than each acquiring its own mechanism."
                 }
               },
               "required": [
@@ -572,6 +572,33 @@
               "description": "Binding. Who may revoke an authorization this mandate produced. CRITICAL: an evaluator that cannot establish who granted an authorization cannot establish who may cancel it, and the direction that permits more is the direction that lets an agent undo a human. Requires capability authorization.grant-provenance.\n\nWHY A SPENDING VOCABULARY NEEDS THIS AT ALL. Cancelling an authorization moves no money, so every constraint about amounts, counterparties and velocity is silent on it. But consider: a human approves a payment above escalationThreshold, the agent then cancels the authorization, no money moves, the audit trail says approved, and the payee is unpaid. The agent has REVERSED A DECISION A HUMAN MADE without spending anything. The question this field answers is not whether the agent may spend; it is who may revoke.\n\n'granting-party' means whoever authorized THIS payment: the mandate for a routine one below escalationThreshold, and the approvers for an escalated one. Resolved at cancellation time from the record of how the payment was authorized rather than declared twice.\n\nONE FIELD RATHER THAN TWO, DELIBERATELY. Separate settings for routine and escalated cancellation would permit a configuration in which an escalated authorization is agent-cancellable, which is the exact case this field exists to forbid. A vocabulary that can express the thing it exists to prevent is a worse vocabulary, whether or not anyone would configure it that way. And the default is part of the control: the safe combination is what an issuer gets, not what they assemble.\n\nWHAT THIS DOES NOT BIND, stated here rather than discovered. This governs cancellation that routes through an evaluator honouring the mandate. The token contract knows the authorizer, not this credential, so a party holding the authorizer's key can sign a cancellation the contract will honour. That is not a gap in this control: the authorizer's key is the principal's, held where the agent cannot reach it, and 'a party with the principal's key can act as the principal' is true of every credential system. The boundary this field relies on is key custody, and the gap would be an agent able to reach that key, which the custody profile is what prevents.",
               "x-opUnavailableInput": "deny",
               "x-opRequiresCapability": "authorization.grant-provenance"
+            },
+            "obligationUniqueness": {
+              "type": "object",
+              "description": "Binding. At most one payment per obligation reference within a window. CRITICAL: an evaluator that cannot attribute a prior payment to an obligation cannot tell a duplicate from a first attempt. Requires capability obligation.attribution.\n\nWHY THIS IS NOT COVERED BY THE AMOUNT CONSTRAINTS. Every other field here bounds how much, to whom, and how fast. None of them can see that two payments were for THE SAME THING: two payments of 80 to one payee within a daily cap of 500 are indistinguishable from one payment made twice, and the second is the canonical failure of a claims or refund system.\n\nDEMONSTRATED, NOT HYPOTHESISED. A restarted agent with no memory of a payment that settled while it was not running re-issued it, because the interface distinguished nothing between 'never paid' and 'paid while you were absent'. The visibility fix (an obligation reference recorded in the ledger and surfaced on discovery) closes the amnesia case. This field is the enforcement half, for the case where the reference is present and a payment is attempted against it anyway.\n\nWHAT AN AGENT-SUPPLIED REFERENCE BINDS. Against amnesia, completely: an agent that has forgotten a payment cannot vary a reference it does not remember. Against malice it is advisory, because an agent that wants to pay twice can send a different reference. The strong version is a reference the agent CANNOT vary because the counterparty supplied it, which is the payee-supplied obligation identity reserved on counterpartyVelocityCap.matchOn. Same control from two directions; neither is built, and whichever is built first should satisfy both.",
+              "properties": {
+                "window": {
+                  "type": "string",
+                  "pattern": "^P(?:\\d+D|T\\d+H)$",
+                  "description": "ISO-8601 duration, rolling backwards. Same granularity limits as counterpartyVelocityCap and for the same reason: finer invites clock-skew disputes across hosts."
+                },
+                "onMissingReference": {
+                  "type": "string",
+                  "enum": [
+                    "deny",
+                    "allow"
+                  ],
+                  "default": "deny",
+                  "description": "What to do with a payment that carries no obligation reference at all. `deny` makes the reference mandatory in practice, which is the only setting under which this constraint bounds anything: `allow` lets an agent opt out of the check by omitting the field."
+                }
+              },
+              "required": [
+                "window",
+                "onMissingReference"
+              ],
+              "additionalProperties": false,
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "obligation.attribution"
             }
           },
           "additionalProperties": false
@@ -1591,6 +1618,47 @@
             }
           },
           "$comment": "actionScope.cancellationAuthority is unevaluable without authorization.grant-provenance: an evaluator that cannot establish who granted an authorization cannot decide who may revoke it. Declared in the credential rather than inferred, because engines never dereference this schema."
+        },
+        {
+          "if": {
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "obligationUniqueness"
+                ]
+              }
+            },
+            "required": [
+              "actionScope"
+            ]
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "obligation.attribution"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.obligationUniqueness is unevaluable without obligation.attribution: an evaluator that cannot attribute a prior payment to an obligation cannot tell a duplicate from a first attempt."
         }
       ]
     },
