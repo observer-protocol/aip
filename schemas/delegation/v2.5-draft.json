@@ -645,7 +645,7 @@
             },
             "reversalHandling": {
               "type": "object",
-              "description": "Binding. What a reversal of a settled payment does to the budget, and it turns on whether the reversal is CERTIFIED or CONTESTED. Requires capability obligation.attribution.\n\nAn ACH return is certified when it arrives: the money came back and it stays back. A card chargeback is a reversal that is ITSELF REVERSIBLE, unknown for weeks while the merchant may represent. Same fact, different certainty, which is the outcome union's second axis appearing one layer down on a rail it was not built against.\n\nRestoring headroom immediately is right for the first and wrong for the second: if the representment succeeds the payment stands and the headroom should never have returned. So a contested reversal holds, exactly as an indeterminate outcome holds, and resolves through reconciliation when the dispute does.",
+              "description": "Binding. What a reversal of a settled payment does to the budget, and it turns on whether the reversal is CERTIFIED or CONTESTED. Requires capability obligation.attribution.\n\nAn ACH return is certified when it arrives: the money came back and it stays back. A card chargeback is a reversal that is ITSELF REVERSIBLE, unknown for weeks while the merchant may represent. Same fact, different certainty, which is the outcome union's second axis appearing one layer down on a rail it was not built against.\n\nRestoring headroom immediately is right for the first and wrong for the second: if the representment succeeds the payment stands and the headroom should never have returned. So a contested reversal holds, exactly as an indeterminate outcome holds, and resolves through reconciliation when the dispute does.\n\nCOUPLED TO requiredPayerConsent ON COLLECTIONS, and the schema enforces it rather than describing it: a mandate that collects and declares this field must name a consent type, because the consent type determines the reversal exposure. Reading this field without it produces confident wrong answers.",
               "properties": {
                 "onCertifiedReversal": {
                   "type": "string",
@@ -692,6 +692,32 @@
               "description": "Binding. Which payer-consent types are acceptable for COLLECTIONS under this mandate. CRITICAL, deny on unavailable input, requires capability payer-consent.verify. Scoped in drafts/payer-consent-attestation.md.\n\nSame reason as settlementDestinations and the same structure. Without the field there is nothing to leave empty: an inbound deployment against a mandate that requires no payer consent is indistinguishable from one where the question was never asked. With it, that deployment is refused rather than permitted.\n\nSATISFIED BY AN ATTESTATION REFERENCING A CONSENT GOVERNED ELSEWHERE, not by a consent this protocol issues. A payer-consent credential the principal issues is the party who benefits from a control supplying the evidence the control was satisfied, which is the defect this field exists to close. The consent is a SEPA mandate, a Nacha authorization, a network stored-credential: governed by a scheme, not by us. We bind to it.\n\nTHE TYPE IS LOAD-BEARING, NOT DESCRIPTIVE. SEPA CORE gives the debtor an unconditional eight-week refund and thirteen months for an unauthorized collection; SEPA B2B gives no refund right at all. Same rail family, opposite reversal exposure, so the value here changes what reversalHandling should do. Treating them alike holds headroom that is free or releases headroom that is not.\n\nAND IT DOES NOT COVER THE COLLECTOR'S PER-COLLECTION DUTIES. SEPA requires the creditor to notify the debtor before collecting. That is not a property of the consent and no attestation about the consent evidences it. Nothing here should be read as evidence those duties were performed.",
               "x-opUnavailableInput": "deny",
               "x-opRequiresCapability": "payer-consent.verify"
+            },
+            "blockedPaymentNotice": {
+              "type": "object",
+              "description": "Binding. Who must be TOLD when a denial persists, which is not who can unblock it. Requires capability notice.dispatch. Surfaced by the operator-duties read; see drafts/operator-duties-read.md.\n\nEVERY OTHER FIELD HERE SAYS NOT MORE THAN. A prompt-pay statute says NOT LATER THAN, and that is not a bound with the sign flipped: a bound constrains an action that is happening, a deadline constrains the absence of one.\n\nSo a cap that correctly denies can leave the principal in breach of a statutory obligation to pay. The control works exactly as designed and the outcome is a violation. This was sighted once already, in obligationUniqueness, where counting a bounced payment as a duplicate blocked a payor from a statutory duty to pay; that was read as a defect in the uniqueness proxy and was also the first appearance of this class.\n\nTHE PROTOCOL CANNOT DISCHARGE A DUTY TO ACT. No signed artifact makes a late payment timely. What it can do is refuse to be silent, which is all this field claims to do. It does not satisfy a deadline and must not be presented as satisfying one.\n\napprovers names who can RAISE a cap. This names who is accountable when it is not raised, and they are routinely different people.",
+              "properties": {
+                "notify": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Parties who must be notified. Not required to be approvers, and usually should not be: the person authorised to raise a cap is not necessarily the person accountable for a missed deadline."
+                },
+                "afterDuration": {
+                  "type": "string",
+                  "pattern": "^P(?:\\d+D|T\\d+H)$",
+                  "description": "How long a denial may persist before the notice is owed. A denial resolved inside this window needed no escalation."
+                }
+              },
+              "required": [
+                "notify",
+                "afterDuration"
+              ],
+              "additionalProperties": false,
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "notice.dispatch"
             }
           },
           "additionalProperties": false
@@ -1916,6 +1942,75 @@
             }
           },
           "$comment": "actionScope.requiredPayerConsent is unevaluable without payer-consent.verify."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "settlementDestinations",
+                  "reversalHandling"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredPayerConsent"
+                ]
+              }
+            }
+          },
+          "$comment": "A mandate that COLLECTS (settlementDestinations present) and declares reversalHandling must also name requiredPayerConsent, because the consent type determines the reversal exposure and reversalHandling is uninterpretable without it. SEPA CORE gives an unconditional eight-week refund and thirteen months for an unauthorized collection; SEPA B2B gives none. Cards add a second case: an undisclosed refund policy means the cardholder wins the dispute by default, and that disclosure is part of the consent artifact. Two fields that must agree with nothing enforcing agreement is the divergence risk already closed on prose and denials."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "blockedPaymentNotice"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "notice.dispatch"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.blockedPaymentNotice is undischargeable without notice.dispatch."
         }
       ]
     },

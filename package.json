@@ -1,0 +1,12 @@
+{
+  "name": "op-aip-schemas",
+  "private": true,
+  "type": "module",
+  "description": "AIP schemas. The test asserts the draft's field couplings fire, and stay silent where they should.",
+  "scripts": {
+    "test": "node schemas/delegation/test/couplings.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1"
+  }
+}
