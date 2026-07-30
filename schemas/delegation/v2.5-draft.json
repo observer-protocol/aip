@@ -575,7 +575,7 @@
             },
             "obligationUniqueness": {
               "type": "object",
-              "description": "Binding. At most one payment per obligation reference within a window. CRITICAL: an evaluator that cannot attribute a prior payment to an obligation cannot tell a duplicate from a first attempt. Requires capability obligation.attribution.\n\nWHY THIS IS NOT COVERED BY THE AMOUNT CONSTRAINTS. Every other field here bounds how much, to whom, and how fast. None of them can see that two payments were for THE SAME THING: two payments of 80 to one payee within a daily cap of 500 are indistinguishable from one payment made twice, and the second is the canonical failure of a claims or refund system.\n\nDEMONSTRATED, NOT HYPOTHESISED. A restarted agent with no memory of a payment that settled while it was not running re-issued it, because the interface distinguished nothing between 'never paid' and 'paid while you were absent'. The visibility fix (an obligation reference recorded in the ledger and surfaced on discovery) closes the amnesia case. This field is the enforcement half, for the case where the reference is present and a payment is attempted against it anyway.\n\nWHAT AN AGENT-SUPPLIED REFERENCE BINDS. Against amnesia, completely: an agent that has forgotten a payment cannot vary a reference it does not remember. Against malice it is advisory, because an agent that wants to pay twice can send a different reference. The strong version is a reference the agent CANNOT vary because the counterparty supplied it, which is the payee-supplied obligation identity reserved on counterpartyVelocityCap.matchOn. Same control from two directions; neither is built, and whichever is built first should satisfy both.",
+              "description": "Binding. At most one payment per obligation reference within a window. CRITICAL: an evaluator that cannot attribute a prior payment to an obligation cannot tell a duplicate from a first attempt. Requires capability obligation.attribution.\n\nWHY THIS IS NOT COVERED BY THE AMOUNT CONSTRAINTS. Every other field here bounds how much, to whom, and how fast. None of them can see that two payments were for THE SAME THING: two payments of 80 to one payee within a daily cap of 500 are indistinguishable from one payment made twice, and the second is the canonical failure of a claims or refund system.\n\nDEMONSTRATED, NOT HYPOTHESISED. A restarted agent with no memory of a payment that settled while it was not running re-issued it, because the interface distinguished nothing between 'never paid' and 'paid while you were absent'. The visibility fix (an obligation reference recorded in the ledger and surfaced on discovery) closes the amnesia case. This field is the enforcement half, for the case where the reference is present and a payment is attempted against it anyway.\n\nWHAT AN AGENT-SUPPLIED REFERENCE BINDS. Against amnesia, completely: an agent that has forgotten a payment cannot vary a reference it does not remember. Against malice it is advisory, because an agent that wants to pay twice can send a different reference. The strong version is a reference the agent CANNOT vary because the counterparty supplied it, which is the payee-supplied obligation identity reserved on counterpartyVelocityCap.matchOn. Same control from two directions; neither is built, and whichever is built first should satisfy both.\n\nWHAT COUNTS TOWARD THE LIMIT: A PAYMENT THAT SETTLED AND STAYED SETTLED. Not payments attempted.\n\nThe field as first drafted counted attempts, and that would have made a bounced payment PERMANENT: a claimant whose payment was returned through no fault of their own could never be paid, because the obligation had had its one payment and the constraint held. For a payor under a statutory obligation to pay, a control that blocks them from paying is worse than no control. Payouts to new counterparties bounce routinely.\n\nSo a payment in state `returned` does not consume uniqueness, and a re-attempt after a return sees a count of zero. Walked through: pay (count 1, provisional), return arrives (count 0), re-attempt (count 1, provisional), no return within the window (count 1, final). At most one at every step, and never zero when a payment is standing.\n\nTHE WINDOW IS DERIVED FROM THE RAIL, NOT CONFIGURED HERE. How long a settlement must stand before it is final is a property of the rail: an ACH return can arrive days later and a card chargeback runs to roughly 540. Restating it as a number in the credential would let an issuer declare a window shorter than the rail's, which would count a payment final while it could still be reversed. An evaluator declaring obligation.attribution is declaring it knows the settlement-finality window of the rails it evaluates. Same reasoning as deriving a retention floor from dispute windows rather than choosing a number.\n\nAND THE WINDOW HAS ITS OWN STATE, which a caller must be able to see. During it an obligation is neither safely payable nor definitively paid. An agent asking `has this been settled` correctly gets yes; an agent asking `may I pay this` must get something closer to not-yet, AND NOT BECAUSE IT IS PAID. Collapsing those two answers reproduces the defect this clause exists to prevent, one question along.",
               "properties": {
                 "window": {
                   "type": "string",
@@ -595,6 +595,29 @@
               "required": [
                 "window",
                 "onMissingReference"
+              ],
+              "additionalProperties": false,
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "obligation.attribution"
+            },
+            "reattemptAfterReturn": {
+              "type": "object",
+              "description": "Binding. Whether a returned payment may be re-attempted, and how often. Requires capability obligation.attribution.\n\nRESERVED BECAUSE A RETURN IS AN OBSTACLE REPORT AND OBSTACLE REPORTS LOSE TO THE INSTRUCTION. Measured, not assumed: an agent shown a state meaning 'a human declined by inaction' read it, quoted it back, and paid anyway, because the task said make sure this gets paid. Visibility is sufficient when it reports completion and is not sufficient when it reports an obstacle, and a return tells an agent its goal is unachieved and still reachable. Telling it more carefully does not work; the words were read.\n\nTHE RETURN REASON IS THE AXIS. An insufficient-funds return may clear on a retry; a closed account will not, and re-attempting it bounces again forever. That is the same transient-versus-terminal distinction the rail outcome union already carries, arriving on a second rail, which is a point in favour of those axes being properties of moving value rather than of any one rail.\n\nReserved rather than built. Whether it is enforced in v1 is separate from whether it is expressible, and the door closes at the mint.",
+              "properties": {
+                "maxAttempts": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Total settled-and-returned cycles permitted for one obligation. 0 forbids any re-attempt after a return."
+                },
+                "onlyIfTransient": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Re-attempt only where the rail classifies the return as transient. Default true: a terminal return re-attempted is a loop, and the default should be the safe combination rather than something an issuer assembles."
+                }
+              },
+              "required": [
+                "maxAttempts",
+                "onlyIfTransient"
               ],
               "additionalProperties": false,
               "x-opUnavailableInput": "deny",
@@ -1659,6 +1682,47 @@
             }
           },
           "$comment": "actionScope.obligationUniqueness is unevaluable without obligation.attribution: an evaluator that cannot attribute a prior payment to an obligation cannot tell a duplicate from a first attempt."
+        },
+        {
+          "if": {
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "reattemptAfterReturn"
+                ]
+              }
+            },
+            "required": [
+              "actionScope"
+            ]
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "obligation.attribution"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.reattemptAfterReturn is unevaluable without obligation.attribution: an evaluator that cannot attribute a return to an obligation cannot count re-attempts against it."
         }
       ]
     },
