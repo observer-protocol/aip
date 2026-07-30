@@ -59,3 +59,58 @@ would have caught both.
 ## Open question (not policy-blocking)
 
 This policy is silent on URLs that *were* published but never referenced by any issued credential — i.e. URLs we could safely repurpose. We do not currently distinguish, and treat all published URLs as immutable by default. If a case ever arises where this matters, the policy may be revised to add an explicit "withdrawn before use" carve-out; until then, the conservative default holds.
+
+---
+
+# Designing constraint fields
+
+A separate concern from immutability, recorded here because it governs what goes into a schema before
+the immutability rule freezes it.
+
+## A constraint whose boundary the constrained party sets is not a constraint
+
+> **Any time a field lets the issuer parameterise the thing being enforced against, ask what the weakest
+> legal value does. If the weakest legal value is "no constraint", the field is decorative.**
+
+The trigger is recognisable in advance, which is what makes this worth stating rather than discovering
+each time. Three instances:
+
+**A settlement-finality window declared in the credential.** `obligationUniqueness` counts payments that
+settled and stayed settled, which needs a period during which no reversal arrived. Had that period been a
+field, an issuer could declare one shorter than the rail's actual return window and a payment would count
+as final while it could still be reversed. **Fixed by deriving it from the rail**: an evaluator declaring
+`obligation.attribution` declares it knows the settlement-finality window of the rails it evaluates, and
+the credential says nothing about duration.
+
+**`onMissingReference` defaulting to allow.** A payment carrying no obligation reference would skip the
+uniqueness check entirely, so an agent could opt out of the control by omitting a field. **Fixed by
+defaulting to deny**, which makes the reference mandatory in practice.
+
+**`allowed_counterparty_types` declarable but unenforceable.** The property was defined in the spec,
+accepted by three published schemas, recommended to issuers, and no engine could enforce it. An issuer
+could satisfy their own review by declaring a constraint that did nothing. **Fixed by withdrawing it**
+and denying credentials that carry it, with the reason stated rather than a silent ignore.
+
+## The two ways out
+
+**Derive it from something the constrained party does not control.** Second field derived this way after
+the resolver's retention floor, which comes from the dispute windows of the rails involved rather than
+from a number anyone chose. A derived bound survives someone asking why it is that value.
+
+**Or default to the safe combination** so it is what an issuer gets rather than what they assemble.
+`onlyIfTransient` on `reattemptAfterReturn` defaults to true, and `cancellationAuthority` defaults to
+`granting-party`, for the same reason: the failure mode is an issuer who never thought about the field,
+and the default is the whole control for them.
+
+## And a vocabulary defect surfaces when a rail behaviour meets the field
+
+Not when the field is reviewed. A field is correct on its own terms, which is exactly what makes a scope
+error a scope error, so reviewing it finds nothing.
+
+`obligationUniqueness` counted payments *attempted* and would have made a bounced payment permanent,
+blocking a payor from a statutory duty to pay. Reviewing the field would never have surfaced that. Asking
+what an ACH return does to the ledger did, because no rail with returns existed when the field was
+written.
+
+**So walk a rail's behaviours against the vocabulary before writing its adapter**, and expect scope
+errors rather than inconsistencies. The procedure is in `op-mcp-payment-server/docs/RAIL-ADAPTER-PROCEDURE.md`.
