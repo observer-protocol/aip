@@ -599,7 +599,7 @@
                     "outstanding-balance"
                   ],
                   "default": "outstanding-balance",
-                  "description": "What is counted. Only `outstanding-balance` exists: a payment count is the proxy that failed twice, and the enum is closed so it cannot be reintroduced as an option."
+                  "description": "What is counted. DO NOT SIMPLIFY THIS TO A CONSTANT BECAUSE IT HAS ONE MEMBER. A single-member enum reads redundant and is the opposite: adding a member to a closed enum is a schema version, so `payments` can never come back as an option without a deliberate mint. A free string or an open enum would let someone later declare a payment count and reintroduce the defect that made a bounced payment permanent.\n\nThis is the anti-lockstep pattern run in reverse: OPEN where the vocabulary must grow, CLOSED where a wrong value must stay unavailable."
                 },
                 "onMissingReference": {
                   "type": "string",

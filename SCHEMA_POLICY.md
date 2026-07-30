@@ -114,3 +114,28 @@ written.
 
 **So walk a rail's behaviours against the vocabulary before writing its adapter**, and expect scope
 errors rather than inconsistencies. The procedure is in `op-mcp-payment-server/docs/RAIL-ADAPTER-PROCEDURE.md`.
+
+### Before letting an issuer parameterise a constraint, evaluate the weakest legal value
+
+A bound the constrained party sets is not always unsafe. It depends which way the weakest value points,
+and that is a per-field question with no general answer.
+
+**Evaluate the weakest legal value the field admits. If it WEAKENS the control, derive the bound instead
+of accepting it. If it TIGHTENS the control, declaring it is safe.**
+
+Two fields of the same shape, opposite answers:
+
+- **Settlement finality**, declared, is unsafe. The weakest value is a short window, and a short window
+  counts a payment final while it can still reverse. Derive it from the rail.
+- **Uniqueness window**, declared, is safe. The weakest value is also a short window, and a short window
+  treats MORE payments as potential duplicates rather than fewer. The failure mode is a redundant check,
+  not a missed one.
+
+Same shape, opposite safety direction. The general form of the earlier rule still holds and is narrower
+than it first appeared: *a constraint whose boundary the constrained party sets is not a constraint* is
+true precisely when the weakest legal value weakens the control. Apply the test, do not apply the
+conclusion.
+
+And note that deriving is not free. Deriving from the wrong property is worse than declaring: the
+uniqueness window derived from finality was sound reasoning applied to the wrong rail property, and it
+would have held obligations unpayable for eighteen months.
