@@ -45,19 +45,19 @@ t('the real credential, patched only for v2.5 requirements', {}, true);
 
 console.log('\n-- consent/reversal coupling FIRES, citing the right rule --');
 t('collects + reversalHandling, NO consent type -> REJECTED',
-  { settlementDestinations:['acct-1'], reversalHandling:REV }, false, 'requiredPayerConsent');
+  { settlementDestinations:[{kind:'iban',value:'DE00'}], reversalHandling:REV }, false, 'requiredPayerConsent');
 t('...the same mandate WITH a consent type -> accepted',
-  { settlementDestinations:['acct-1'], reversalHandling:REV, requiredPayerConsent:['sepa-dd-core'] }, true);
+  { settlementDestinations:[{kind:'iban',value:'DE00'}], reversalHandling:REV, requiredPayerConsent:['sepa-dd-core'] }, true);
 
 console.log('\n-- and it is SILENT where it should be (both outcomes) --');
 t('OUTBOUND: reversalHandling, no destinations, no consent -> accepted', { reversalHandling:REV }, true);
-t('collects WITHOUT reversalHandling -> accepted', { settlementDestinations:['acct-1'], requiredPayerConsent:['sepa-dd-core'] }, true);
+t('collects WITHOUT reversalHandling -> accepted', { settlementDestinations:[{kind:'iban',value:'DE00'}], requiredPayerConsent:['sepa-dd-core'] }, true);
 
 console.log('\n-- notice/capability coupling, both outcomes --');
 t('blockedPaymentNotice without notice.dispatch -> REJECTED',
-  { blockedPaymentNotice:{ notify:['ops'], afterDuration:'P2D' }, requiredEnforcement:{ capabilities:[] } }, false, 'capabilities');
+  { blockedPaymentNotice:{ notify:[{kind:'role',value:'ops'}], afterDuration:'P2D' }, requiredEnforcement:{ capabilities:[] } }, false, 'capabilities');
 t('...with the capability -> accepted',
-  { blockedPaymentNotice:{ notify:['ops'], afterDuration:'P2D' } }, true);
+  { blockedPaymentNotice:{ notify:[{kind:'role',value:'ops'}], afterDuration:'P2D' } }, true);
 
 console.log(bad ? `\n${bad} FAILED` : '\nAll couplings: fire where they should, silent where they should not, right reasons.');
 process.exit(bad ? 1 : 0);

@@ -677,9 +677,26 @@
               "type": "array",
               "minItems": 1,
               "items": {
-                "type": "string"
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "value"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                    "description": "What sort of identifier `value` is. Pattern-constrained string, deliberately not an enum, same discipline as counterparty identifiers and capability names: a new kind must not require a schema version. AN UNRECOGNIZED KIND DENIES, so the open vocabulary is not an open door. Kinds recognized today: iban, us-ach, address, did."
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The account identifier, in the namespace its kind names."
+                  }
+                }
               },
-              "description": "Binding. Where funds COLLECTED under this mandate may land. CRITICAL, deny on unavailable input, and requires capability settlement.destination-check.\n\nRESERVED BEFORE THE FEATURE EXISTS, DELIBERATELY, because what is being reserved is not the feature but THE PLACE WHERE ITS ABSENCE IS DETECTABLE. When the agent pays, the destination is the counterparty and allowList bounds it. When the agent COLLECTS, the destination is the principal's own account and nothing in this vocabulary said which: an agent authorised to collect could direct funds to an account the principal does not control while every constraint passed, because there was no field to leave empty and nothing for `deny` to fire on. An absence with no name.\n\nWith the field reserved, an inbound deployment against a mandate that names no destination is refused rather than permitted, and the default is safe rather than absent. That is what deny-on-unavailable is for, and it only works if the field exists to be unavailable.\n\nENUMERATED ACCOUNTS ONLY. Not a pattern, not a prefix rule: a principal who cannot enumerate the accounts their money may land in should not be authorising collection.\n\nAND THIS FIELD DOES NOT AUTHORISE COLLECTION. It bounds where collected funds may go. Whether the PAYER consented to being collected from is a different party's artifact and is not expressible here; see the note on approvers. A deployment that collects is relying on payer consent obtained elsewhere.",
+              "description": "Binding. Where funds COLLECTED under this mandate may land. CRITICAL, deny on unavailable input, and requires capability settlement.destination-check.\n\nRESERVED BEFORE THE FEATURE EXISTS, DELIBERATELY, because what is being reserved is not the feature but THE PLACE WHERE ITS ABSENCE IS DETECTABLE. When the agent pays, the destination is the counterparty and allowList bounds it. When the agent COLLECTS, the destination is the principal's own account and nothing in this vocabulary said which: an agent authorised to collect could direct funds to an account the principal does not control while every constraint passed, because there was no field to leave empty and nothing for `deny` to fire on. An absence with no name.\n\nWith the field reserved, an inbound deployment against a mandate that names no destination is refused rather than permitted, and the default is safe rather than absent. That is what deny-on-unavailable is for, and it only works if the field exists to be unavailable.\n\nENUMERATED ACCOUNTS ONLY. Not a pattern, not a prefix rule: a principal who cannot enumerate the accounts their money may land in should not be authorising collection.\n\nAND THIS FIELD DOES NOT AUTHORISE COLLECTION. It bounds where collected funds may go. Whether the PAYER consented to being collected from is a different party's artifact and is not expressible here; see the note on approvers. A deployment that collects is relying on payer consent obtained elsewhere.\n\nTYPED IDENTIFIERS, NOT BARE STRINGS, on the same reasoning as the counterparty lists. A bare account string means nothing without its namespace: an evaluator comparing it to the rail's answer is comparing two strings that were never in the same namespace, and a destination check that silently compares an IBAN to a token address is worse than no check.",
               "x-opUnavailableInput": "deny",
               "x-opRequiresCapability": "settlement.destination-check"
             },
@@ -687,7 +704,9 @@
               "type": "array",
               "minItems": 1,
               "items": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                "description": "A consent type. Pattern-constrained and open for the same reason capability names are: a new scheme must not require a schema version, and an UNRECOGNIZED TYPE DENIES. Recognized today: sepa-dd-core, sepa-dd-b2b, ach-authorization, card-stored-credential."
               },
               "description": "Binding. Which payer-consent types are acceptable for COLLECTIONS under this mandate. CRITICAL, deny on unavailable input, requires capability payer-consent.verify. Scoped in drafts/payer-consent-attestation.md.\n\nSame reason as settlementDestinations and the same structure. Without the field there is nothing to leave empty: an inbound deployment against a mandate that requires no payer consent is indistinguishable from one where the question was never asked. With it, that deployment is refused rather than permitted.\n\nSATISFIED BY AN ATTESTATION REFERENCING A CONSENT GOVERNED ELSEWHERE, not by a consent this protocol issues. A payer-consent credential the principal issues is the party who benefits from a control supplying the evidence the control was satisfied, which is the defect this field exists to close. The consent is a SEPA mandate, a Nacha authorization, a network stored-credential: governed by a scheme, not by us. We bind to it.\n\nTHE TYPE IS LOAD-BEARING, NOT DESCRIPTIVE. SEPA CORE gives the debtor an unconditional eight-week refund and thirteen months for an unauthorized collection; SEPA B2B gives no refund right at all. Same rail family, opposite reversal exposure, so the value here changes what reversalHandling should do. Treating them alike holds headroom that is free or releases headroom that is not.\n\nAND IT DOES NOT COVER THE COLLECTOR'S PER-COLLECTION DUTIES. SEPA requires the creditor to notify the debtor before collecting. That is not a property of the consent and no attestation about the consent evidences it. Nothing here should be read as evidence those duties were performed.",
               "x-opUnavailableInput": "deny",
@@ -701,7 +720,24 @@
                   "type": "array",
                   "minItems": 1,
                   "items": {
-                    "type": "string"
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "value"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                        "description": "What sort of identifier `value` is. Pattern-constrained string, deliberately not an enum, same discipline as counterparty identifiers and capability names: a new kind must not require a schema version. AN UNRECOGNIZED KIND DENIES, so the open vocabulary is not an open door. Kinds recognized today: did, email, role."
+                      },
+                      "value": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The party to notify, in the namespace its kind names."
+                      }
+                    }
                   },
                   "description": "Parties who must be notified. Not required to be approvers, and usually should not be: the person authorised to raise a cap is not necessarily the person accountable for a missed deadline."
                 },
