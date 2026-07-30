@@ -296,7 +296,7 @@
             },
             "per_transaction_ceiling": {
               "type": "object",
-              "description": "Binding. Per-action amount ceiling, same-currency comparison only \u2014 no FX. See \u00a71.2 and \u00a73.2.",
+              "description": "Binding. Per-action amount ceiling, same-currency comparison only \u2014 no FX. See \u00a71.2 and \u00a73.2. DIRECTION NOTE: on an OUTBOUND payment this protects the principal from overspending. On a COLLECTION it limits how much may be taken from a payer, which protects the party this mandate does not represent. Same field, and an operator reading it on an inbound mandate will read it as protecting them and it does the opposite.",
               "properties": {
                 "amount": {
                   "type": "string",
@@ -374,13 +374,24 @@
                     "mandate-identifier"
                   ],
                   "description": "Which identifier prior spend is aggregated by. Locked to the identifier the MANDATE matched, never the rail's own name for the same party: on a card those are different strings, and aggregating by the rail's version would leave the ledger holding something the mandate cannot read back. A future value for payee-supplied obligation identity is reserved rather than assumed. CONSEQUENCE, STATED RATHER THAN LEFT TO BE DISCOVERED: if an adapter cannot resolve a rail's payee identity back to the identifier the mandate uses, prior spend cannot be attributed, the cap cannot be evaluated, and x-opUnavailableInput fires. That denies THE PAYMENT and not merely the aggregation, so an unmapped counterparty makes this mandate unusable for that payee until the mapping exists. This is the intended direction: a cumulative cap that silently stops applying to counterparties the adapter cannot name is a cap that the least identifiable counterparties escape. CROSS-REFERENCE: obligationUniqueness reserves the same payee-supplied identity from the other direction, as the non-forgeable version of an agent-supplied obligation reference. Whichever is built first should satisfy both rather than each acquiring its own mechanism."
+                },
+                "responseMode": {
+                  "type": "string",
+                  "enum": [
+                    "deny",
+                    "report-and-proceed",
+                    "report-and-hold"
+                  ],
+                  "default": "deny",
+                  "description": "What happens when the cap is crossed, DECLARED rather than inferred from the field's presence.\n\nA budget cap denies. An AML reporting threshold reports. Same mechanism, opposite response, and getting it wrong is bad in both directions: denying a collection because it crossed a reporting threshold is not what anyone wants, and reporting a budget breach without denying it is the advisory posture this protocol exists to replace.\n\n`report-and-hold` is the third value because a threshold that holds pending review is the shape a compliance function actually wants, and it routes to awaiting: operator-compliance, which arrived independently from the payout walkthrough. Same axis, second appearance."
                 }
               },
               "required": [
                 "amount",
                 "currency",
                 "window",
-                "matchOn"
+                "matchOn",
+                "responseMode"
               ],
               "additionalProperties": false,
               "x-opUnavailableInput": "deny",
@@ -424,7 +435,7 @@
             },
             "approvers": {
               "type": "object",
-              "description": "Keys permitted to approve a request that escalation routes to a human. Named by the ISSUER, in the credential: the principal decides who may approve on their behalf, and it must not be settable by the operator or the agent or the control is decorative. Distinct from the credential's own issuer, which is what lets a designated operator key satisfy a mandate issued by an offline principal DID. CRITICAL: an evaluator that ignores this accepts approvals from anyone.",
+              "description": "Keys permitted to approve a request that escalation routes to a human. Named by the ISSUER, in the credential: the principal decides who may approve on their behalf, and it must not be settable by the operator or the agent or the control is decorative. Distinct from the credential's own issuer, which is what lets a designated operator key satisfy a mandate issued by an offline principal DID. CRITICAL: an evaluator that ignores this accepts approvals from anyone.\n\nA RAIL'S OWN AUTHENTICATION IS NOT AN APPROVAL UNDER THIS MANDATE, and satisfying one does not satisfy the other. A 3DS challenge authenticates whoever holds the card, who may be neither the principal nor anyone named here. Treating it as an approval would let a rail's authentication satisfy a governance control it was never party to. Third place this distinction has surfaced, after the handle's resolution axis and evidenceStrength on the attestation, and stated here once rather than in three places.",
               "additionalProperties": false,
               "required": [
                 "keys"
@@ -575,12 +586,20 @@
             },
             "obligationUniqueness": {
               "type": "object",
-              "description": "Binding. At most one payment per obligation reference within a window. CRITICAL: an evaluator that cannot attribute a prior payment to an obligation cannot tell a duplicate from a first attempt. Requires capability obligation.attribution.\n\nWHY THIS IS NOT COVERED BY THE AMOUNT CONSTRAINTS. Every other field here bounds how much, to whom, and how fast. None of them can see that two payments were for THE SAME THING: two payments of 80 to one payee within a daily cap of 500 are indistinguishable from one payment made twice, and the second is the canonical failure of a claims or refund system.\n\nDEMONSTRATED, NOT HYPOTHESISED. A restarted agent with no memory of a payment that settled while it was not running re-issued it, because the interface distinguished nothing between 'never paid' and 'paid while you were absent'. The visibility fix (an obligation reference recorded in the ledger and surfaced on discovery) closes the amnesia case. This field is the enforcement half, for the case where the reference is present and a payment is attempted against it anyway.\n\nWHAT AN AGENT-SUPPLIED REFERENCE BINDS. Against amnesia, completely: an agent that has forgotten a payment cannot vary a reference it does not remember. Against malice it is advisory, because an agent that wants to pay twice can send a different reference. The strong version is a reference the agent CANNOT vary because the counterparty supplied it, which is the payee-supplied obligation identity reserved on counterpartyVelocityCap.matchOn. Same control from two directions; neither is built, and whichever is built first should satisfy both.\n\nWHAT COUNTS TOWARD THE LIMIT: A PAYMENT THAT SETTLED AND STAYED SETTLED. Not payments attempted.\n\nThe field as first drafted counted attempts, and that would have made a bounced payment PERMANENT: a claimant whose payment was returned through no fault of their own could never be paid, because the obligation had had its one payment and the constraint held. For a payor under a statutory obligation to pay, a control that blocks them from paying is worse than no control. Payouts to new counterparties bounce routinely.\n\nSo a payment in state `returned` does not consume uniqueness, and a re-attempt after a return sees a count of zero. Walked through: pay (count 1, provisional), return arrives (count 0), re-attempt (count 1, provisional), no return within the window (count 1, final). At most one at every step, and never zero when a payment is standing.\n\nTHE WINDOW IS DERIVED FROM THE RAIL, NOT CONFIGURED HERE. How long a settlement must stand before it is final is a property of the rail: an ACH return can arrive days later and a card chargeback runs to roughly 540. Restating it as a number in the credential would let an issuer declare a window shorter than the rail's, which would count a payment final while it could still be reversed. An evaluator declaring obligation.attribution is declaring it knows the settlement-finality window of the rails it evaluates. Same reasoning as deriving a retention floor from dispute windows rather than choosing a number.\n\nAND THE WINDOW HAS ITS OWN STATE, which a caller must be able to see. During it an obligation is neither safely payable nor definitively paid. An agent asking `has this been settled` correctly gets yes; an agent asking `may I pay this` must get something closer to not-yet, AND NOT BECAUSE IT IS PAID. Collapsing those two answers reproduces the defect this clause exists to prevent, one question along.",
+              "description": "Binding. An obligation may not be paid again once it is DISCHARGED. CRITICAL: an evaluator that cannot attribute payments to an obligation cannot tell a duplicate from a first attempt. Requires capability obligation.attribution.\n\nCOUNTS SATISFACTION, NOT PAYMENTS, and the earlier drafts counted payments. That proxy failed twice in one day. A bounced payment sent money and discharged nothing, so counting it made a returned payment permanent and blocked a payor from a statutory duty to pay. A partial card capture sent money and discharged part of it, so counting it consumed the obligation while leaving a balance the top-up could not clear. Neither is a duplicate and both counted as one.\n\n'How many times has money been sent' is not 'has this obligation been discharged', and no count of events answers the second. So the question is whether the OUTSTANDING BALANCE IS ZERO, which is what an accounts-payable system asks.\n\nTHE WINDOW IS DECLARED HERE AND IS NOT THE RAIL'S FINALITY WINDOW. An earlier draft derived it from settlement finality, on the reasoning that a derived bound cannot be weakened by the party it constrains. That reasoning is sound and the derivation was from the wrong property: finality asks 'could this be reversed' and runs to roughly 540 days on cards, while uniqueness asks 'would another payment be a duplicate' and is operational. Deriving one from the other holds an obligation neither safely payable nor definitively paid for eighteen months, and would have an agent re-paying claims disputed a year later. A reversal at day 400 is a dispute to handle, not an obligation to pay again.\n\nDeclared rather than derived is safe HERE because the weakest legal value makes the control tighter: a short window cannot make a payment look discharged while it is not. That is the test to apply to any issuer-set bound.\n\nDEPENDS ON AN EXPECTED AMOUNT, which the obligation record carries and which is agent-supplied at v1. Against amnesia that works completely; against malice it is advisory, because an agent that wants to pay twice can overstate what is owed. The non-forgeable version is payee-supplied and is reserved on counterpartyVelocityCap.matchOn, now arriving from a third direction.",
               "properties": {
                 "window": {
                   "type": "string",
                   "pattern": "^P(?:\\d+D|T\\d+H)$",
-                  "description": "ISO-8601 duration, rolling backwards. Same granularity limits as counterpartyVelocityCap and for the same reason: finer invites clock-skew disputes across hosts."
+                  "description": "ISO-8601 duration, rolling backwards. OPERATIONAL, not the rail finality window; see the description."
+                },
+                "basis": {
+                  "type": "string",
+                  "enum": [
+                    "outstanding-balance"
+                  ],
+                  "default": "outstanding-balance",
+                  "description": "What is counted. Only `outstanding-balance` exists: a payment count is the proxy that failed twice, and the enum is closed so it cannot be reintroduced as an option."
                 },
                 "onMissingReference": {
                   "type": "string",
@@ -594,6 +613,7 @@
               },
               "required": [
                 "window",
+                "basis",
                 "onMissingReference"
               ],
               "additionalProperties": false,
@@ -622,6 +642,46 @@
               "additionalProperties": false,
               "x-opUnavailableInput": "deny",
               "x-opRequiresCapability": "obligation.attribution"
+            },
+            "reversalHandling": {
+              "type": "object",
+              "description": "Binding. What a reversal of a settled payment does to the budget, and it turns on whether the reversal is CERTIFIED or CONTESTED. Requires capability obligation.attribution.\n\nAn ACH return is certified when it arrives: the money came back and it stays back. A card chargeback is a reversal that is ITSELF REVERSIBLE, unknown for weeks while the merchant may represent. Same fact, different certainty, which is the outcome union's second axis appearing one layer down on a rail it was not built against.\n\nRestoring headroom immediately is right for the first and wrong for the second: if the representment succeeds the payment stands and the headroom should never have returned. So a contested reversal holds, exactly as an indeterminate outcome holds, and resolves through reconciliation when the dispute does.",
+              "properties": {
+                "onCertifiedReversal": {
+                  "type": "string",
+                  "enum": [
+                    "restore-headroom"
+                  ],
+                  "default": "restore-headroom",
+                  "description": "The money came back and stays back. Closed enum: holding headroom against money that has demonstrably returned denies legitimate payments."
+                },
+                "onContestedReversal": {
+                  "type": "string",
+                  "enum": [
+                    "hold",
+                    "restore-headroom"
+                  ],
+                  "default": "hold",
+                  "description": "Default hold. Restoring on a contested reversal frees budget against a payment that may yet stand, which is the double-spend shape the indeterminate work closed."
+                }
+              },
+              "required": [
+                "onCertifiedReversal",
+                "onContestedReversal"
+              ],
+              "additionalProperties": false,
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "obligation.attribution"
+            },
+            "settlementDestinations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              },
+              "description": "Binding. Where funds COLLECTED under this mandate may land. CRITICAL, deny on unavailable input, and requires capability settlement.destination-check.\n\nRESERVED BEFORE THE FEATURE EXISTS, DELIBERATELY, because what is being reserved is not the feature but THE PLACE WHERE ITS ABSENCE IS DETECTABLE. When the agent pays, the destination is the counterparty and allowList bounds it. When the agent COLLECTS, the destination is the principal's own account and nothing in this vocabulary said which: an agent authorised to collect could direct funds to an account the principal does not control while every constraint passed, because there was no field to leave empty and nothing for `deny` to fire on. An absence with no name.\n\nWith the field reserved, an inbound deployment against a mandate that names no destination is refused rather than permitted, and the default is safe rather than absent. That is what deny-on-unavailable is for, and it only works if the field exists to be unavailable.\n\nENUMERATED ACCOUNTS ONLY. Not a pattern, not a prefix rule: a principal who cannot enumerate the accounts their money may land in should not be authorising collection.\n\nAND THIS FIELD DOES NOT AUTHORISE COLLECTION. It bounds where collected funds may go. Whether the PAYER consented to being collected from is a different party's artifact and is not expressible here; see the note on approvers. A deployment that collects is relying on payer consent obtained elsewhere.",
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "settlement.destination-check"
             }
           },
           "additionalProperties": false
@@ -1723,6 +1783,88 @@
             }
           },
           "$comment": "actionScope.reattemptAfterReturn is unevaluable without obligation.attribution: an evaluator that cannot attribute a return to an obligation cannot count re-attempts against it."
+        },
+        {
+          "if": {
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "reversalHandling"
+                ]
+              }
+            },
+            "required": [
+              "actionScope"
+            ]
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "obligation.attribution"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.reversalHandling is unevaluable without obligation.attribution."
+        },
+        {
+          "if": {
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "settlementDestinations"
+                ]
+              }
+            },
+            "required": [
+              "actionScope"
+            ]
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "settlement.destination-check"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.settlementDestinations is unevaluable without settlement.destination-check."
         }
       ]
     },
