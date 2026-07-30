@@ -12,7 +12,7 @@
 // of them was in the process.
 
 import { readFileSync } from 'node:fs';
-const schema = JSON.parse(readFileSync(new URL('../v2.5-draft.json', import.meta.url), 'utf8'));
+const schema = JSON.parse(readFileSync(new URL('../v2.5.json', import.meta.url), 'utf8'));
 const scope = schema.properties.credentialSubject.properties.actionScope.properties;
 
 let pass = 0, fail = 0;
@@ -71,6 +71,17 @@ console.log('\n── every critical field denies on unavailable input and names
   for (const [k, v] of withCap) {
     assert(`${k} also denies on unavailable input`, v['x-opUnavailableInput'] === 'deny', v['x-opUnavailableInput']);
   }
+}
+
+console.log('\n── the schema agrees with its own filename ──');
+{
+  // Caught at the mint: the draft still carried the v2.4 title. On a frozen schema that is
+  // permanent, and it is drift of exactly the kind this file exists to catch mechanically
+  // rather than by someone happening to look.
+  const version = new URL('../v2.5.json', import.meta.url).pathname.match(/(v\d+\.\d+)/)[1];
+  assert(`$id names ${version}`, schema.$id?.endsWith(`/${version}.json`), schema.$id);
+  assert(`title names ${version}`, schema.title?.endsWith(version), schema.title);
+  assert('$id is on the published host', schema.$id?.startsWith('https://observerprotocol.org/schemas/delegation/'), schema.$id);
 }
 
 console.log(`\nconventions: ${pass} passed, ${fail} failed`);

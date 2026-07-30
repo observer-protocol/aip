@@ -7,7 +7,7 @@
 import Ajv from 'ajv';
 import { readFileSync } from 'node:fs';
 
-const schema = JSON.parse(readFileSync(new URL('../v2.5-draft.json', import.meta.url), 'utf8'));
+const schema = JSON.parse(readFileSync(new URL('../v2.5.json', import.meta.url), 'utf8'));
 const real = JSON.parse(readFileSync(new URL('./base-credential.json', import.meta.url), 'utf8'));
 const ajv = new Ajv({ strict:false, allErrors:true });
 const v = ajv.compile(schema);

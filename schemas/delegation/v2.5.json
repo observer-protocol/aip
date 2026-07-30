@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://observerprotocol.org/schemas/delegation/v2.5.json",
-  "title": "Observer Protocol Delegation Credential v2.4",
+  "title": "Observer Protocol Delegation Credential v2.5",
   "description": "AIP v0.8 draft-2 \u2014 ObserverDelegationCredential. Introduces the criticality split (actionScope critical by construction, advisoryScope advisory by membership), the requiredEnforcement capability gate, and per-field unavailable-input semantics. x-opUnavailableInput is a schema annotation, not a credential property: it states what a conforming evaluator that DOES implement the field does when the input it needs is missing.",
   "type": "object",
   "required": [
