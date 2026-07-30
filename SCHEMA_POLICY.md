@@ -139,3 +139,24 @@ conclusion.
 And note that deriving is not free. Deriving from the wrong property is worse than declaring: the
 uniqueness window derived from finality was sound reasoning applied to the wrong rail property, and it
 would have held obligations unpayable for eighteen months.
+
+### A check whose pass condition is "something was rejected" must assert WHAT rejected it
+
+The coupling check written to verify the consent/reversal dependency printed PASS twice while rejecting
+fixtures over a missing top-level `id`. The rule under test never fired. The outcome was correct, the
+reason was not, and nothing in the outcome could reveal that.
+
+**A control that reports a verdict without citing its reason is unfalsifiable.** Fourth instance: the
+runner label, the publish guard, a harness attributing a cause it had not tested, and now a schema check
+verifying a rule it had not exercised. Every one of them agreed with the hypothesis being tested.
+
+Two halves of the fix, both required:
+
+1. **A rejection must cite the rule under test.** Assert on the error path or message, not on the
+   boolean. `ok === false` is satisfied by any defect in the fixture.
+2. **Build fixtures from a real artifact, not by hand.** Three hand-built credentials failed on unrelated
+   required properties before one validated. A real signed credential fails only for the reason under
+   test, and a baseline case asserting it validates unmodified makes that checkable rather than assumed.
+
+The second half is the same lesson as reading identifiers rather than writing better predicates: the
+artifact knows things the author of the fixture does not.
