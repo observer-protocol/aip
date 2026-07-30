@@ -207,3 +207,27 @@ mint is a whole version.
 
 **The close condition is therefore not "have fields stopped arriving" but "have we walked every rail we
 intend to support, and does the schema agree with itself".** Both are answerable. "Has it settled" is not.
+
+### Publication procedure: three conditions, all checkable
+
+Publication is the irreversible step. Run all three before deploying, not after.
+
+1. **Fixtures against the exact file about to be served**, not against source. If they behave
+   identically the deploy is a copy; if they diverge, this is the last moment anyone can tell. After
+   publication the bytes are the definition and a difference is permanent rather than fixable. Re-run
+   against the served bytes afterward.
+2. **Byte-identical, `sha256` verified after serving**, and the canonical-source conformance row run
+   against the post-deploy state. v2.2 and v2.4 were orphaned at exactly this step and the check exists
+   because of them.
+3. **Schemas only, additions only.** `scripts/publish-precheck.sh <website-repo>`.
+
+**Condition 3 became a script because v2.5 satisfied it by luck.** The publication commit landed on a
+session branch carrying unrelated work, in a repo whose default branch is `master` rather than `main`,
+and nothing extra shipped only because the other commit was already upstream. Had it not been, unrelated
+work would have deployed alongside an immutable schema and nothing in the process would have objected.
+
+The check resolves `origin/HEAD` rather than assuming `main`, refuses any non-schema path, and refuses
+any *modification* to a published schema, since a publication adds a URL and never changes one.
+
+**Whoever runs the next mint will not have this session's context.** That is the whole argument for
+turning each of these from an intention into a check.
