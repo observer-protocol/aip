@@ -353,7 +353,7 @@
             },
             "counterpartyVelocityCap": {
               "type": "object",
-              "description": "Binding. Cumulative spend to ONE counterparty within a rolling window. CRITICAL: an evaluator that cannot attribute prior spend to a counterparty MUST refuse the credential rather than ignore the cap, on the same reasoning as cumulative_budget. Exists because per_transaction_ceiling is a control on the shape of a transaction and not on the size of an obligation: a ceiling of 25 does not stop an obligation of 100 being settled as four payments of 25, every one of which the mandate permits. Demonstrated behaviour, not a hypothetical — an agent given a 100 invoice under a ceiling of 25 split it into four and correctly reported that each payment was within the mandate. The gap is not rail-specific: max 2000 per booking does not stop four 500 legs, and max 200 per refund does not stop four 50 credits to one customer. Same-currency comparison only, no FX, per §1.2. Note the limit of this field: it approximates obligation identity by counterparty aggregation, which over-restricts a payee legitimately paid several times in a window and under-restricts an obligation split across payees. Obligation identity supplied by the payee is the stronger control and is deferred, because it requires the payee to participate.",
+              "description": "Binding. Cumulative spend to ONE counterparty within a rolling window. CRITICAL: an evaluator that cannot attribute prior spend to a counterparty MUST refuse the credential rather than ignore the cap, on the same reasoning as cumulative_budget. Exists because per_transaction_ceiling is a control on the shape of a transaction and not on the size of an obligation: a ceiling of 25 does not stop an obligation of 100 being settled as four payments of 25, every one of which the mandate permits. Demonstrated behaviour, not a hypothetical \u2014 an agent given a 100 invoice under a ceiling of 25 split it into four and correctly reported that each payment was within the mandate. The gap is not rail-specific: max 2000 per booking does not stop four 500 legs, and max 200 per refund does not stop four 50 credits to one customer. Same-currency comparison only, no FX, per \u00a71.2. Note the limit of this field: it approximates obligation identity by counterparty aggregation, which over-restricts a payee legitimately paid several times in a window and under-restricts an obligation split across payees. Obligation identity supplied by the payee is the stronger control and is deferred, because it requires the payee to participate.",
               "properties": {
                 "amount": {
                   "type": "string",
@@ -561,6 +561,17 @@
                 }
               },
               "x-opUnavailableInput": "deny"
+            },
+            "cancellationAuthority": {
+              "type": "string",
+              "enum": [
+                "agent",
+                "granting-party"
+              ],
+              "default": "granting-party",
+              "description": "Binding. Who may revoke an authorization this mandate produced. CRITICAL: an evaluator that cannot establish who granted an authorization cannot establish who may cancel it, and the direction that permits more is the direction that lets an agent undo a human. Requires capability authorization.grant-provenance.\n\nWHY A SPENDING VOCABULARY NEEDS THIS AT ALL. Cancelling an authorization moves no money, so every constraint about amounts, counterparties and velocity is silent on it. But consider: a human approves a payment above escalationThreshold, the agent then cancels the authorization, no money moves, the audit trail says approved, and the payee is unpaid. The agent has REVERSED A DECISION A HUMAN MADE without spending anything. The question this field answers is not whether the agent may spend; it is who may revoke.\n\n'granting-party' means whoever authorized THIS payment: the mandate for a routine one below escalationThreshold, and the approvers for an escalated one. Resolved at cancellation time from the record of how the payment was authorized rather than declared twice.\n\nONE FIELD RATHER THAN TWO, DELIBERATELY. Separate settings for routine and escalated cancellation would permit a configuration in which an escalated authorization is agent-cancellable, which is the exact case this field exists to forbid. A vocabulary that can express the thing it exists to prevent is a worse vocabulary, whether or not anyone would configure it that way. And the default is part of the control: the safe combination is what an issuer gets, not what they assemble.\n\nWHAT THIS DOES NOT BIND, stated here rather than discovered. This governs cancellation that routes through an evaluator honouring the mandate. The token contract knows the authorizer, not this credential, so a party holding the authorizer's key can sign a cancellation the contract will honour. That is not a gap in this control: the authorizer's key is the principal's, held where the agent cannot reach it, and 'a party with the principal's key can act as the principal' is true of every credential system. The boundary this field relies on is key custody, and the gap would be an agent able to reach that key, which the custody profile is what prevents.",
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "authorization.grant-provenance"
             }
           },
           "additionalProperties": false
@@ -1539,6 +1550,47 @@
             }
           },
           "$comment": "An operator-held approver needs only DID resolution and signature verification. A device-bound one requires verifying the key IS device-bound, which is not honourable until enrolment publishes something checkable."
+        },
+        {
+          "if": {
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "cancellationAuthority"
+                ]
+              }
+            },
+            "required": [
+              "actionScope"
+            ]
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "authorization.grant-provenance"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.cancellationAuthority is unevaluable without authorization.grant-provenance: an evaluator that cannot establish who granted an authorization cannot decide who may revoke it. Declared in the credential rather than inferred, because engines never dereference this schema."
         }
       ]
     },
