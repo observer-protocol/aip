@@ -428,7 +428,7 @@
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+(:[A-Za-z0-9]+)?$"
                   },
-                  "description": "Exact capability identifiers, <domain>.<capability>[:<parameter>]."
+                  "description": "Exact capability identifiers, <domain>.<capability>[:<parameter>].\n\nDECLARING A CAPABILITY IS A CLAIM ABOUT WHAT THIS EVALUATOR CAN COMPUTE, AND SOME OF THEM HAVE PREREQUISITES THAT ARE NOT OBVIOUS FROM THE NAME. Declaring one you cannot satisfy is worse than declaring nothing: the credential will be accepted and the control silently under-enforced, which is the exact failure the capability gate exists to prevent.\n\n  obligation.attribution  REQUIRES an obligation record carrying an EXPECTED AMOUNT and a PARTIALLY-SATISFIED state. obligationUniqueness asks whether the outstanding balance is zero, not whether a payment happened, and an evaluator whose record only counts payments CANNOT COMPUTE THAT. Declaring it anyway is a false claim: a bounced payment will read as a duplicate and a partial capture will consume the obligation while a balance remains.\n  purchase-terms.verify   REQUIRES the ability to verify a counterparty signature over the terms, not merely to read them. Reading an unverified cart is the agent asserting the counterparty's price.\n  payer-consent.verify    REQUIRES resolving a consent by its COMPOSITE reference and checking its amendment marker. A reference alone is unique per creditor, not globally.\n\nRecorded here because this is where an implementer wiring an adapter decides what to declare, and a prerequisite stated only in the constrained field's description is a prerequisite they will not read."
                 }
               },
               "x-opUnavailableInput": "deny"
@@ -754,6 +754,18 @@
               "additionalProperties": false,
               "x-opUnavailableInput": "deny",
               "x-opRequiresCapability": "notice.dispatch"
+            },
+            "requiredPurchaseTerms": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                "description": "An artifact type. Pattern-constrained and open for the same reason capability names are, and an UNRECOGNIZED TYPE DENIES. Recognized today: ap2-cart-mandate, x402-payment-required, signed-invoice."
+              },
+              "description": "Binding. Which COUNTERPARTY-SIGNED statements of what is being bought, and for how much, are acceptable for purchases under this mandate. CRITICAL, deny on unavailable input, requires capability purchase-terms.verify. Surfaced by the AP2 walkthrough; see drafts/operator-duties-ap2.md.\n\nTHE GAP: nothing else here requires that the amount paid corresponds to terms the COUNTERPARTY stated. An agent can pay any permitted counterparty any amount inside the ceiling, for anything at all, and every constraint passes. On x402 that is fine because the 402 response IS the price statement. On AP2 it is the whole point of the protocol, because the merchant-signed cart is the price guarantee.\n\nTHIRD ARRIVAL OF THE SAME NEED, which is why it is not speculative. Reserved once on counterpartyVelocityCap.matchOn as the payee-supplied obligation identity. Named again in obligationUniqueness, where the expected amount is agent-supplied and therefore advisory against malice, with the note that the non-forgeable version is payee-supplied. A merchant-signed cart IS that non-forgeable version, and it exists as a real artifact rather than as something we would invent.\n\nSYMMETRIC WITH requiredPayerConsent AND CLOSES THE SAME HOLE IN THE OPPOSITE DIRECTION. That field covers collections and asks whether the party being collected from agreed. This covers purchases and asks whether the party being paid stated the price. Both answer the agent asserting, unchallenged, what the other party wanted.\n\nSATISFIED BY AN ARTIFACT THE COUNTERPARTY SIGNED, never by one we issue. Same reasoning as payer consent: an artifact the paying side produces about the paid side's terms is the party who benefits supplying the evidence.\n\nRECORD RETENTION IS NOT THIS FIELD. A regulated operator's statutory duty to retain a mandate chain attaches on every rail and cannot be evidenced here. Third member of the inexpressible set, with SEPA pre-notification on requiredPayerConsent and sanctions screening on geographicAllowedOnly.",
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "purchase-terms.verify"
             }
           },
           "additionalProperties": false
@@ -2047,6 +2059,47 @@
             }
           },
           "$comment": "actionScope.blockedPaymentNotice is undischargeable without notice.dispatch."
+        },
+        {
+          "if": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredPurchaseTerms"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "purchase-terms.verify"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.requiredPurchaseTerms is unevaluable without purchase-terms.verify."
         }
       ]
     },
