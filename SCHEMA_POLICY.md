@@ -161,6 +161,11 @@ Two halves of the fix, both required:
 The second half is the same lesson as reading identifiers rather than writing better predicates: the
 artifact knows things the author of the fixture does not.
 
+**And where a test could be satisfied by its own setup, choose setup values the implementation cannot
+produce.** Then a regression to pass-through is visibly wrong rather than quietly green. This and the
+cite-the-rule requirement are the same concern from opposite ends: one asserts the reason, the other
+poisons the shortcut. Mutation-check both directions, which is what makes either stick.
+
 ### Two checks, neither substituting for the other
 
 A **rail walkthrough** asks *what did we never consider*. A **conventions check** asks *where do we
@@ -190,6 +195,12 @@ Stated because v2.5 was described as minted while its `$id` still returned 404, 
 easy to lose: the mint is the decision to close, publication is the act that makes closing permanent.
 **Verify the URL serves before treating a schema as frozen, and make final corrections before deploying,
 never after.**
+
+**A document may name a schema version only once that version serves.** It reads as pedantry until the
+version does not ship, and then it is a file asserting something no URL supports. A `DECLARED_UNENFORCEABLE`
+entry naming "withdrawn at v2.5" was rejected on exactly this ground while v2.5 was a draft, and the same
+entry naming the served versions is correct now, because publication made them facts. The rule paid off
+within a day, in a file neither of us was looking at.
 
 ### When to close a schema, with the v2.5 evidence
 
