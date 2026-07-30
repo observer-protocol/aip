@@ -682,6 +682,16 @@
               "description": "Binding. Where funds COLLECTED under this mandate may land. CRITICAL, deny on unavailable input, and requires capability settlement.destination-check.\n\nRESERVED BEFORE THE FEATURE EXISTS, DELIBERATELY, because what is being reserved is not the feature but THE PLACE WHERE ITS ABSENCE IS DETECTABLE. When the agent pays, the destination is the counterparty and allowList bounds it. When the agent COLLECTS, the destination is the principal's own account and nothing in this vocabulary said which: an agent authorised to collect could direct funds to an account the principal does not control while every constraint passed, because there was no field to leave empty and nothing for `deny` to fire on. An absence with no name.\n\nWith the field reserved, an inbound deployment against a mandate that names no destination is refused rather than permitted, and the default is safe rather than absent. That is what deny-on-unavailable is for, and it only works if the field exists to be unavailable.\n\nENUMERATED ACCOUNTS ONLY. Not a pattern, not a prefix rule: a principal who cannot enumerate the accounts their money may land in should not be authorising collection.\n\nAND THIS FIELD DOES NOT AUTHORISE COLLECTION. It bounds where collected funds may go. Whether the PAYER consented to being collected from is a different party's artifact and is not expressible here; see the note on approvers. A deployment that collects is relying on payer consent obtained elsewhere.",
               "x-opUnavailableInput": "deny",
               "x-opRequiresCapability": "settlement.destination-check"
+            },
+            "requiredPayerConsent": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              },
+              "description": "Binding. Which payer-consent types are acceptable for COLLECTIONS under this mandate. CRITICAL, deny on unavailable input, requires capability payer-consent.verify. Scoped in drafts/payer-consent-attestation.md.\n\nSame reason as settlementDestinations and the same structure. Without the field there is nothing to leave empty: an inbound deployment against a mandate that requires no payer consent is indistinguishable from one where the question was never asked. With it, that deployment is refused rather than permitted.\n\nSATISFIED BY AN ATTESTATION REFERENCING A CONSENT GOVERNED ELSEWHERE, not by a consent this protocol issues. A payer-consent credential the principal issues is the party who benefits from a control supplying the evidence the control was satisfied, which is the defect this field exists to close. The consent is a SEPA mandate, a Nacha authorization, a network stored-credential: governed by a scheme, not by us. We bind to it.\n\nTHE TYPE IS LOAD-BEARING, NOT DESCRIPTIVE. SEPA CORE gives the debtor an unconditional eight-week refund and thirteen months for an unauthorized collection; SEPA B2B gives no refund right at all. Same rail family, opposite reversal exposure, so the value here changes what reversalHandling should do. Treating them alike holds headroom that is free or releases headroom that is not.\n\nAND IT DOES NOT COVER THE COLLECTOR'S PER-COLLECTION DUTIES. SEPA requires the creditor to notify the debtor before collecting. That is not a property of the consent and no attestation about the consent evidences it. Nothing here should be read as evidence those duties were performed.",
+              "x-opUnavailableInput": "deny",
+              "x-opRequiresCapability": "payer-consent.verify"
             }
           },
           "additionalProperties": false
@@ -1865,6 +1875,47 @@
             }
           },
           "$comment": "actionScope.settlementDestinations is unevaluable without settlement.destination-check."
+        },
+        {
+          "if": {
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredPayerConsent"
+                ]
+              }
+            },
+            "required": [
+              "actionScope"
+            ]
+          },
+          "then": {
+            "required": [
+              "actionScope"
+            ],
+            "properties": {
+              "actionScope": {
+                "required": [
+                  "requiredEnforcement"
+                ],
+                "properties": {
+                  "requiredEnforcement": {
+                    "required": [
+                      "capabilities"
+                    ],
+                    "properties": {
+                      "capabilities": {
+                        "contains": {
+                          "const": "payer-consent.verify"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "actionScope.requiredPayerConsent is unevaluable without payer-consent.verify."
         }
       ]
     },
