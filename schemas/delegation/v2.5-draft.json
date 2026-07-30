@@ -373,7 +373,7 @@
                   "enum": [
                     "mandate-identifier"
                   ],
-                  "description": "Which identifier prior spend is aggregated by. Locked to the identifier the MANDATE matched, never the rail's own name for the same party: on a card those are different strings, and aggregating by the rail's version would leave the ledger holding something the mandate cannot read back. A future value for payee-supplied obligation identity is reserved rather than assumed."
+                  "description": "Which identifier prior spend is aggregated by. Locked to the identifier the MANDATE matched, never the rail's own name for the same party: on a card those are different strings, and aggregating by the rail's version would leave the ledger holding something the mandate cannot read back. A future value for payee-supplied obligation identity is reserved rather than assumed. CONSEQUENCE, STATED RATHER THAN LEFT TO BE DISCOVERED: if an adapter cannot resolve a rail's payee identity back to the identifier the mandate uses, prior spend cannot be attributed, the cap cannot be evaluated, and x-opUnavailableInput fires. That denies THE PAYMENT and not merely the aggregation, so an unmapped counterparty makes this mandate unusable for that payee until the mapping exists. This is the intended direction: a cumulative cap that silently stops applying to counterparties the adapter cannot name is a cap that the least identifiable counterparties escape."
                 }
               },
               "required": [
