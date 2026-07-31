@@ -278,3 +278,21 @@ That is the argument for enumerating rather than listing. The first correction s
 second came from searching for *descriptions that count things or characterise a party*. **The third came
 from running that same search again after the count had moved**, and would not have been in a draft
 assembled from memory.
+
+### The pattern search has a trigger, not a completion
+
+Three stale descriptions were found three different ways: one by accident, one by searching the pattern,
+and one by running that same search again after the count had moved. **The third existed for one
+exchange.** *Six rails* went stale the moment the payout adapter was built rather than only walked.
+
+So this is not a task that finishes. **Re-run the pattern search at three named events:**
+
+1. **When a rail is walked.** A walk can falsify a characterisation.
+2. **When a rail is built.** Building falsified one that walking had not, and it moved a count.
+3. **Before any mint.** The last moment a correction is free.
+
+Named events rather than "periodically", so it is checkable rather than remembered.
+
+**Check the fields carrying COUNTS first.** `approvers` counted duty shapes; `requiredPurchaseTerms`
+counted rails. Both went stale **by arithmetic rather than by being wrong** — nobody edited them and
+nobody had to. A description asserting a number is a description with an expiry nobody wrote down.
