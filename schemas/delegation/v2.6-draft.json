@@ -460,10 +460,11 @@
                       "assurance": {
                         "type": "string",
                         "enum": [
+                          "org-attested",
                           "operator-held",
                           "device-bound"
                         ],
-                        "description": "How strongly the approver key's provenance is established, as a CONSTRAINT rather than a label. `operator-held` needs only DID resolution and signature verification and is honourable today. `device-bound` requires verifying the key IS device-bound, which needs enrolment to have published something checkable into the DID document, and therefore requires the approval.assurance-verification capability: an evaluator without it must refuse the CREDENTIAL rather than accept an approval whose provenance it cannot check. Asymmetric by design."
+                        "description": "What the approval signature ESTABLISHES. Three levels, and THE WEAKEST IS DECLARED RATHER THAN DEFAULTED.\n\n`org-attested`: THE ORG ISSUED THE CREDENTIAL AND THE ORG'S KEY SIGNED IT. It verifies, and what it proves is that the ORG ASSERTED an approval occurred, not that a specific human authorised a specific payment. That is a signed log entry. The product's position is that authorisation is verifiable WITHOUT TRUSTING THE CUSTOMER, and this form requires trusting the customer about the one fact the approval exists to establish. It ships in v1 and it ships NAMED, because a form that is silently the default is a form nobody reads as weaker.\n\n`operator-held`: the APPROVER is the issuer and the service holds their key. The signature is the approver's, so it is evidence about a person rather than about a company's records.\n\n`device-bound`: the approver is the issuer and the key is bound to their device. Not built, and REACHABLE. An assurance level describing the approver's key is meaningless if no approver key is involved, so making org-attested the architecture rather than a level would foreclose this permanently rather than deferring it.\n\nADDED AT v2.6. v2.5 carries only the latter two and is frozen, so a v1 approval credential cannot declare its own assurance and validate until v2.6 serves."
                       }
                     }
                   }
