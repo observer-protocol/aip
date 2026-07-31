@@ -268,3 +268,13 @@ rediscovering the discrepancy.
 CHARACTERISE a party are the ones a later walk can falsify. Both entries above were found by searching
 v2.5 for exactly those two patterns, after one of them had already surfaced by accident. **A pending list
 built incrementally from accidents is a list of what someone noticed.**
+
+**Third correction, found by the search rather than remembered:** `requiredPurchaseTerms` said the
+arrival pattern was *"the same signal the outcome union got from six rails."* Seven rails and one
+framework have now been walked, counting the payout adapter that was **built** rather than only walked.
+Right when written.
+
+That is the argument for enumerating rather than listing. The first correction surfaced by accident. The
+second came from searching for *descriptions that count things or characterise a party*. **The third came
+from running that same search again after the count had moved**, and would not have been in a draft
+assembled from memory.
