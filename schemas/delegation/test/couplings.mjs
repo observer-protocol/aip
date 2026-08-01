@@ -7,7 +7,15 @@
 import Ajv from 'ajv';
 import { readFileSync } from 'node:fs';
 
-const schema = JSON.parse(readFileSync(new URL('../v2.6-draft.json', import.meta.url), 'utf8'));
+// THE FILE ABOUT TO BE SERVED, not a file with a similar name.
+//
+// PUBLICATION CONDITION 1 IS "fixtures against the exact file about to be served, not against source",
+// and this line read `../v2.6-draft.json` regardless of what the caller passed. Running it with a path argument LOOKED
+// like it validated that path and validated the draft. The two were byte-identical at the v2.6 mint, so
+// the answer was right and the check was not.
+const TARGET = process.argv[2] ?? new URL('../v2.6-draft.json', import.meta.url).pathname;
+const schema = JSON.parse(readFileSync(TARGET, 'utf8'));
+console.log(`  (validating ${TARGET})`);
 const real = JSON.parse(readFileSync(new URL('./base-credential.json', import.meta.url), 'utf8'));
 const ajv = new Ajv({ strict:false, allErrors:true });
 const v = ajv.compile(schema);
