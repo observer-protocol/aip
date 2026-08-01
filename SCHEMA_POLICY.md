@@ -296,3 +296,52 @@ Named events rather than "periodically", so it is checkable rather than remember
 **Check the fields carrying COUNTS first.** `approvers` counted duty shapes; `requiredPurchaseTerms`
 counted rails. Both went stale **by arithmetic rather than by being wrong** — nobody edited them and
 nobody had to. A description asserting a number is a description with an expiry nobody wrote down.
+
+## v2.6 published 2026-08-01
+
+**`sha256 97eea5ac1dc081d39c062df34b2e08e161482f05dd55dc9a0854683b8a12abc3`**, verified byte-identical
+against the served bytes after deploy. Allowlisted and live: `/health` reports v2.1, v2.3, v2.4, v2.5,
+v2.6.
+
+**Carries:** `org-attested` on `actionScope.approvers.assurance`; `requiresOutcomeMonitoring`; the two
+prose corrections carried from v2.5 (`requiredPurchaseTerms`'s signer characterisation, and the duty-shape
+count).
+
+**Deliberately excluded:** `requiresDecisionAttestation` (§9) and the payor slot. **The reasoning, because
+it is a release rule and not a one-off:** `org-attested` is finished and a v1 approval credential cannot
+declare its own assurance and validate until a version serves it, so this release unblocks a built thing.
+§9 belongs to a surface with an open scope item and the payor slot is unscoped. **Binding a finished piece
+to two unfinished ones sets the release date by whichever is least ready**, and that changed twice in a
+day. Running the sequence twice is a known, small, repeatable cost.
+
+**Reading recorded, because the ruling said "org-attested alone" and three things shipped.**
+`requiresOutcomeMonitoring` and the corrected duty-shape prose are ENTANGLED: the correction names
+`requiresOutcomeMonitoring` as the fourth shape added at v2.6, so shipping the prose without the field
+would leave the schema describing a field it does not have. Both shipped; only what the ruling named was
+excluded.
+
+### The BEFORE leg was a GATE, not a step
+
+Engine-direct on op-vps against the deployed `index.cjs` with `systemd-run --property=EnvironmentFile`:
+
+| | result |
+|---|---|
+| **BEFORE** | `[schema] ... v2.6.json is not in the schema allowlist [v2.1, v2.3, v2.4, v2.5]` |
+| **AFTER** | `[proof] verificationMethod did:key:z6Mkgw... is not a key of the issuer did:web:observerprotocol.org` |
+| **CONTROL** | v2.9 still refused: `not in the schema allowlist [..., v2.6.json]` |
+
+**Same credential across the pair; the only variable is the allowlist.** v2.6 is no longer refused for
+BEING v2.6, the control still refuses for an independent reason, and an unlisted version is still refused
+— membership, not range.
+
+### Condition 1 was not satisfied by the command that appeared to satisfy it
+
+**Both fixture runners hardcoded `v2.6-draft.json` and ignored any path argument.** Running them against
+the file about to be served validated the draft instead. The two were byte-identical at this mint, **so
+the answer was right and the check was not** — the same subject-wider-than-claim shape that has appeared
+repeatedly.
+
+Both now take the target as an argument, print what they validated, and are demonstrated to
+discriminate: a tampered `$id` fails 1 of 28. **Condition 1 is a check rather than an intention, on the
+same argument as condition 3.**
+
