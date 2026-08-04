@@ -3,6 +3,22 @@
 **v2.7 carries BOTH so the next release is not a third sequence.** Publishing is irreversible and its
 cost is a fixed sequence, so two ready things in one release is strictly cheaper than two releases.
 
+> **Ruled 2026-08-04. v2.7 IS THIS PAIR, and `decisionScope` is v2.8.**
+>
+> A separate line of work proposed a different v2.7: `decisionScope` as an optional sibling of
+> `actionScope`, `allowed_policies[]` with the vocabulary nested inside each policy, `hashMethod` per
+> policy, `actionScope` dropped from `required` under an `anyOf` relaxation, and a third
+> `enforcementMode` value `pre_decision_check`. Those four rulings stand unchanged; they attach to
+> **v2.8**. Carrying them here would either displace the two candidates below or make v2.7 a
+> three-item release, which is the third sequence this document's opening rule exists to prevent.
+>
+> **Also ruled: a decision attestation carries NO reason field.** An earlier ruling required one by
+> analogy to `breachedConstraint`. The analogy fails: `breachedConstraint` is our enforcement point's
+> finding about its own decision, whereas a decision reason is the decider's rationale about a
+> decision we did not make. Restating it in our signed artifact makes this system the producer of
+> evidence about a decision it also sells assurance over. `FORBIDDEN_ATTESTATION_FIELDS` and
+> `assertNoObservation` in `op-mcp-payment-server/src/attestation.ts` stay exactly as they are.
+
 ## Candidate 1: `requiresDecisionAttestation` (§9)
 
 **Scoped, not built.** The `DecisionAttestation` credential itself exists — §7's standalone shape, §8's
@@ -36,11 +52,22 @@ Shipping §9 before that would add a third instance rather than closing the seco
 resolving it and checking the signature came from a key in its `assertionMethod` — the same operation the
 delegation path already performs for an issuer, so the mechanism exists and is not wired here.
 
-**2. Verify the signature over the attestation.** `issueDecisionAttestation` signs
+**2. Verify the signature over the attestation.** ~~`issueDecisionAttestation` signs
 `JSON.stringify(attestation)`. **That is not a canonicalisation**, and the rest of this estate signs
 `eddsa-jcs-2022`. Verification cannot be built on `JSON.stringify` — two semantically identical
 attestations with different key order produce different bytes. **This is a change to issuance, not only to
-verification**, and it is the largest single item.
+verification**, and it is the largest single item.~~
+
+**CLOSED 2026-08-01, the day after this was written.** `src/attestation.ts` imports `canonicalise` from
+`./jcs.ts` and signs `signer.sign(canonicalise(attestation))`. The evidence artifact at
+`op-mcp-payment-server/evidence/attestation-2026-08-01/` records both controls: a tampered `outcome`
+does **not** verify, and reordered keys **do**. So the largest single item on this list was already
+done when this list was read, and the estimate below is stale in the same way.
+
+**What item 2 leaves open is verification, not issuance.** `verifyDecisionAttestation()` does not exist.
+It is scoped at ~40 lines in `docs/SCOPE-attestation-in-approval-path.md`, `did:key` only, with `did:web`
+refused by name because `src/` makes no network calls today and adding one puts a deny-on-unavailable
+decision into the approval path.
 
 **3. Bind the attestation to the payment that cites it.** `AttestationCitation.citesDecisionId` is a
 caller-supplied string; nothing makes a payment depend on WHICH attestation it names. Scoped separately in
@@ -55,8 +82,14 @@ one-line decision and it should be made explicitly rather than inherited.
 accepting a constraint it cannot perform.
 
 **Order matters: 2 before 1.** Resolving a decider to check a signature over non-canonical bytes verifies
-nothing. **Estimate: item 2 is the real work and it touches issuance.** The rest is wiring against
-mechanisms that already exist.
+nothing. ~~**Estimate: item 2 is the real work and it touches issuance.**~~ **Revised 2026-08-04:** item
+2's issuance half is done, so the ordering constraint is satisfied and items 1, 4 and 5 are now the
+remaining work. The rest is wiring against mechanisms that already exist.
+
+**Item 4 is answered by the scope doc and needs only confirmation:** an attestation whose decider cannot
+be resolved, or whose DID method is unsupported, renders as `cited-unresolvable` and a signature that
+fails renders as `cited-invalid`. Those are deliberately different states, because an absence and a
+signed artifact failing its own check should never render alike.
 
 ## Candidate 2: the payor slot
 
